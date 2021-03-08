@@ -18,5 +18,5 @@ this folder contains the original un collated data files from the LSPA
 ## collation code
 this folder contains the code used to collate and QAQC the data (where needed) to recode obviously errant data
 
-## master files
+## MASTER FILES
 these are the data that should be used by others, it includes sampling methodology
