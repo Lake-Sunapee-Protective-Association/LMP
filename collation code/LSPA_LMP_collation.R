@@ -1,44 +1,51 @@
 #*****************************************************************
 #*      Cary Institute of Ecosystem Studies (Millbrook, NY)      *
+#*                on behalf of                                   *
+#*              the Lake Sunapee Protective Assosciation         *
 #*                                                               *
-#* TITLE:   Sunapee_long_term_sampling_01Mar2021.R               *
-#* AUTHOR:  Amanda Lindsey, Bethel Steele                        *
+#* TITLE:   LSPA_LMP_collation.R                                 *
+#* AUTHOR:  Bethel Steele steeleb@caryinstitute.org              *
+#* RStudio version: 1.4.1103                                     *
+#* R version: 4.0.3                                              *
 #* PURPOSE: Collate long term records of monitoring data         *
-#*          collected in lake Sunapee                            *
-#* LAST UPDATE: v01Mar2021 - update through 2020                 *
+#*          collected in Lake Sunapee                            *
+#* LAST UPDATE: v08Mar2021 - update in Git                       *
+#*          v01Mar2021 - update through 2020                     *
 #*          v27Jul2020 - update to use tidyverse, update         *
 #*          with data through 2019                               *
 #*          no version change 25Sept2020: updated bio and do     *
 #*          sections                                             *  
-#*                                                               *
 #*****************************************************************
 
-# set working directory - change if running from a different location
-setwd('C:/Users/steeleb/Dropbox/Lake Sunapee/long term Sunapee data')
+# store data directories
+datadir = 'raw data files/'
+dumpdir = 'MASTER FILES/'
+figuredump = 'collation code/tempfigs/'
 
-library(tidyverse)
+library(tidyverse) #v1.3.0
 library(readxl)
 library(ggthemes)
 
 
-# import sunapee id #
-sun_id <- read.csv('raw data/sunapee station ids w SUNSUNGEN.csv', header=T)
+# The data from the LSPA come from three different files: Chemistry, Biology, and DO. In the recent past, 
+#   there have been fluctuations of where data are stored, so this script collates the data, removes obviously
+#   errant values, flags suspect data, and collates all of the data together. At that collation step, further
+#   QAQC is completed on the data to recode datat recorded that were obtained with the sensor in the sediment.
 
-#************************************************
-#### chem data ####
+# CHEMISTRY DATA ####
 
 # import data
-raw_chem_2017 <- read_xlsx("raw data/LMP files/LMP 2017/CHEMISTRY.xlsx", 
+raw_chem_2017 <- read_xlsx(paste0(datadir, "1986-2017/CHEMISTRY.xlsx"), 
                       sheet="CHEMISTRY",
                       col_types = 'text') %>% 
   mutate(DATE = as.Date(as.numeric(DATE), origin = '1899-12-30'))
-raw_chem_2018 <- read_csv('raw data/LMP files/2018/Sunapee 2018 Chem.csv',
+raw_chem_2018 <- read_csv(paste0(datadir, "2018/Sunapee 2018 Chem.csv"),
                           col_types = cols(.default = col_character())) %>% 
   mutate(DATE = as.Date(DATE, format = '%d-%b-%y'))
-raw_chem_2019 <- read_csv('raw data/LMP files/2019/Sunapee2019Chem.csv',
+raw_chem_2019 <- read_csv(paste0(datadir,'2019/Sunapee2019Chem.csv'),
                           col_types = cols(.default = col_character()))%>% 
   mutate(DATE = as.Date(DATE, format = '%d-%b-%y'))
-raw_chem_2020 <- read_csv('raw data/LMP files/2020/Sunapee2020CHEM.csv',
+raw_chem_2020 <- read_csv(paste0(datadir,'2020/Sunapee2020CHEM.csv'),
                           col_types = cols(.default = col_character()))%>% 
   mutate(DATE = as.Date(DATE, format = '%d-%b-%y'))
 
@@ -47,19 +54,23 @@ str(raw_chem_2018)
 str(raw_chem_2019)
 str(raw_chem_2020)
 
+### collate chem data ####
+
 raw_chem <- full_join(raw_chem_2017, raw_chem_2018) %>% 
   full_join(., raw_chem_2019) %>% 
-  full_join(., raw_chem_2020)
+  full_join(., raw_chem_2020) 
+colnames(raw_chem)
 
+chem_vars = c("STATION","Depth","PH","H_ION","ALK","TP","COND","TURBIDITY","Chloride")
 
 #format chem columns to numeric
-raw_chem <- raw_chem %>% 
-  mutate_at(vars(PH, H_ION, ALK, COLOR, TP, COND, TURBIDITY, YEAR, MONTH),
+raw_chem <- raw_chem %>%
+  mutate_at(vars(all_of(chem_vars)),
             ~ as.numeric(.))
 
 # remove unneeded variables and rename others
 raw_chem <- raw_chem %>% 
-  select(-"LAKE", -"TOWN", -"YEAR", -"MONTH", -"H_ION", -"COLOR") %>% 
+  select(-"LAKE", -"TOWN", -"YEAR", -"MONTH", -"COLOR",-'H_ION', -'Date_Sta_Lr',-'CompleteDate') %>% #no data in COLOR or H_ION variable
   rename(date = DATE,
          station =STATION,
          depth_m = Depth,
@@ -68,253 +79,391 @@ raw_chem <- raw_chem %>%
          alk_mglCaCO3 = ALK,
          TP_mgl = TP,
          cond_uScm = COND, 
-         turb_NTU = TURBIDITY)
+         turb_NTU = TURBIDITY,
+         cl_mgl = Chloride,
+         org_id = ID,
+         org_sampid = 'SampleID') %>% 
+  mutate(location = case_when(station <=230 ~ 'lake',
+                              station >230 ~ 'stream'))
 str(raw_chem)
 
+### baseline chem data clean up ####
+# start with a new dataframe
+qaqc_chem <- raw_chem
+
+# look at layer info:
+unique(qaqc_chem$layer)
+qaqc_chem$layer [qaqc_chem$layer=="0"] = "O"
+qaqc_chem$layer [qaqc_chem$layer=="1"] = "I" #presumed transcription error
+qaqc_chem$layer [qaqc_chem$layer=="L"] = "I" #presumed transcription error
+qaqc_chem$layer [qaqc_chem$layer=="N"] = ""
+qaqc_chem$layer [qaqc_chem$layer=="5"] = ""
+
+#recode depth and layer for stream samples
+qaqc_chem$depth_m [qaqc_chem$location=="stream"] = NA_real_
+qaqc_chem$layer [qaqc_chem$location=="stream"] = ""
+
+
+### look at ranges and recode data that are obviously NA or errant ####
 
 # set missing data to NA
-range(raw_chem$pH, na.rm = T)
-raw_chem$pH [raw_chem$pH==-99] = NA
-raw_chem$pH [raw_chem$pH>14] = NA
-range(raw_chem$pH, na.rm = T)
+range(qaqc_chem$pH, na.rm = T)
+qaqc_chem$pH [qaqc_chem$pH==-99] = NA
+range(qaqc_chem$pH, na.rm = T)
+qaqc_chem$pH [qaqc_chem$pH>14] = NA
+range(qaqc_chem$pH, na.rm = T)
 
-range(raw_chem$alk_mglCaCO3, na.rm = T)
-raw_chem$alk_mglCaCO3 [raw_chem$alk_mglCaCO3<=-99] = NA
-raw_chem$alk_mglCaCO3 [raw_chem$alk_mglCaCO3==99] = NA
-range(raw_chem$alk_mglCaCO3, na.rm = T)
+range(qaqc_chem$alk_mglCaCO3, na.rm = T)
+qaqc_chem$alk_mglCaCO3 [qaqc_chem$alk_mglCaCO3<=-99] = NA
+qaqc_chem$alk_mglCaCO3 [qaqc_chem$alk_mglCaCO3==99] = NA
+range(qaqc_chem$alk_mglCaCO3, na.rm = T)
 
-range(raw_chem$TP_mgl, na.rm = T)
-raw_chem$TP_mgl [raw_chem$TP_mgl<=-99] = NA
+range(qaqc_chem$TP_mgl, na.rm = T)
+qaqc_chem$TP_mgl [qaqc_chem$TP_mgl<=-99] = NA
+range(qaqc_chem$TP_mgl, na.rm = T)
+
 #add flag for presumed BDL
-raw_chem <- raw_chem %>% 
+qaqc_chem <- qaqc_chem %>% 
   mutate(TP_flag = case_when(TP_mgl<0.005 ~ 'BDL',
-                             TP_mgl < 0 ~ 'negative value reported, recoded to 0',
+                             TP_mgl < 0 ~ 'BDL, negative value reported, recoded to 0',
                              TRUE ~ '')) %>% 
   mutate(TP_mgl = case_when(TP_mgl< 0 ~ 0,
                             TRUE ~ TP_mgl))
-range(raw_chem$TP_mgl, na.rm = T)
+range(qaqc_chem$TP_mgl, na.rm = T)
 
-range(raw_chem$cond_uScm, na.rm = T)
-raw_chem$cond_uScm [raw_chem$cond_uScm<=-99] = NA
-range(raw_chem$cond_uScm, na.rm = T)
+range(qaqc_chem$cond_uScm, na.rm = T)
+qaqc_chem$cond_uScm [qaqc_chem$cond_uScm<=-99] = NA
+range(qaqc_chem$cond_uScm, na.rm = T)
+#value for cond >9000 was in middle of lake - recoding, because that is obviously errant. The other values >1000 are in streams, which seems reasonable.
+qaqc_chem$cond_uScm [qaqc_chem$cond_uScm>9000] = NA
+range(qaqc_chem$cond_uScm, na.rm = T)
 
-range(raw_chem$turb_NTU, na.rm = T)
-raw_chem$turb_NTU [raw_chem$turb_NTU==-99] = NA
-range(raw_chem$turb_NTU, na.rm = T)
+range(qaqc_chem$turb_NTU, na.rm = T)
+qaqc_chem$turb_NTU [qaqc_chem$turb_NTU==-99] = NA
+range(qaqc_chem$turb_NTU, na.rm = T)
 
-#plot to check for funky values
-#ph
-plot(raw_chem$date, raw_chem$pH)
-#flag the data above 10
-raw_chem <- raw_chem %>% 
-  mutate(ph_flag = case_when(pH>10 ~ 'suspect',
-                             TRUE ~ ''))
-
-#alk
-plot(raw_chem$date, raw_chem$alk_mglCaCO3)
-#remove anomolous point
-#no anomolous points
-
-#TP
-plot(raw_chem$date, raw_chem$TP_mgl)
-#remove anomolous point
-#no anomolous points
-
-#cond
-plot(raw_chem$date, raw_chem$cond_uScm)
-#remove anomolous points above 2500
-raw_chem$cond_uScm [raw_chem$cond_uScm>2500] = NA
-plot(raw_chem$date, raw_chem$cond_uScm)
+range(qaqc_chem$cl_mgl, na.rm = T)
 
 
-#turbidity
-plot(raw_chem$date, raw_chem$turb_NTU)
-#remove anomolous point
-#no anamolous points
+### plot to check for funky values ####
+#### ph ####
+ggplot(qaqc_chem, aes(x = date, y = pH)) +
+  facet_grid(location~. ) +
+  geom_point()
+#recode the data in lake above 10
+qaqc_chem$pH [qaqc_chem$pH>10] = NA
+qaqc_chem$ph_flag [qaqc_chem$pH<5 & location == 'lake'] = 'suspect'
 
-#COLOR IS INCOMPLETE
-# #COLOR
-# plot(raw_chem$date, raw_chem$COLOR)
-# #remove anomolous point
-# #no anamolous points
+#replot
+ggplot(qaqc_chem, aes(x = date, y = pH, color = depth_m)) +
+  facet_grid(location~. ) +
+  geom_point(aes(shape = layer))
+# calculate H+ ion from pH (H+ = 10^-pH) and drop pH column
+qaqc_chem$conc_H_molpl=10^(qaqc_chem$pH * -1)
+qaqc_chem$pH = NULL
 
 
+#### alk ####
+ggplot(qaqc_chem, aes(x = date, y = alk_mglCaCO3, color = depth_m)) +
+  facet_grid(location~. ) +
+  geom_point(aes(shape = layer))
+#flag 0 values as well as in-lake values >9
+qaqc_chem <- qaqc_chem %>% 
+  mutate(alk_flag = case_when(alk_mglCaCO3 == 0 ~ 'suspect',
+                              alk_mglCaCO3 > 9 & location == 'lake' ~ 'suspect',
+                              TRUE ~ ''))
+#### TP ####
+ggplot(qaqc_chem, aes(x = date, y = TP_mgl, color = depth_m)) +
+  facet_grid(location~. , scales = 'free_y') +
+  geom_point(aes(shape = layer))
+#looks good
 
-# calculate H+ ion from pH (H+ = 10^-pH)
-raw_chem$H_M=10^(raw_chem$pH * -1)
-raw_chem$pH = NULL
+#### cond ####
+ggplot(qaqc_chem, aes(x = date, y = cond_uScm, color = depth_m)) +
+  facet_grid(location~. , scales = 'free_y') +
+  geom_point(aes(shape = layer))
+
+#remove anomolous point above 2500
+qaqc_chem$cond_uScm [qaqc_chem$cond_uScm>2500] = NA
+
+#flag values below 25 in lake
+qaqc_chem <- qaqc_chem %>% 
+  mutate(cond_flag = case_when(cond_uScm < 25 & location == 'lake' ~ 'suspect', 
+                               TRUE ~ ''))
+
+#### turbidity ####
+ggplot(qaqc_chem, aes(x = date, y = turb_NTU, color = depth_m)) +
+  facet_grid(location~. , scales = 'free_y') +
+  geom_point(aes(shape = layer))
+#flag in-lake above 30 and stream > 500 
+qaqc_chem <- qaqc_chem %>% 
+  mutate(turb_flag = case_when(turb_NTU >30 & location == 'lake' ~ 'suspect unless recent storm', 
+                               turb_NTU >500 & location == 'stream' ~ 'suspect unless recent storm', 
+                               TRUE ~ ''))
+
+#### chloride ####
+ggplot(qaqc_chem, aes(x = date, y = cl_mgl, color = depth_m)) +
+  facet_grid(location~. , scales = 'free_y') +
+  geom_point(aes(shape = layer))
+
+# look at comments
+unique(qaqc_chem$Comments)
+# move the storm event into own column
+qaqc_chem <- qaqc_chem %>% 
+  mutate(gen_flag = case_when(Comments == 'STORM EVENT' ~ 'storm event sampling',
+                              TRUE ~ ''))
+
+### create vertical dataset, eliminate na rows and export master files ####
 
 #create vertical dataset
-raw_chem_vert <- raw_chem %>% 
-  select(-c(Comments:Date_Sta_Lr)) %>% 
-  gather(parameter, value, -station, -layer, -depth_m, -date, -ph_flag, -TP_flag) %>% 
+colnames(qaqc_chem)
+qaqc_chem_vert <- qaqc_chem %>% 
+  select(-Comments) %>% 
+  gather(parameter, value, -station, -layer, -depth_m, -date, -TP_flag, -alk_flag, -cond_flag, -turb_flag, -gen_flag, -org_id, -org_sampid, -location) %>% 
   filter(!is.na(value)) %>% 
-  mutate(flag = case_when(parameter == 'TP_mgl' & !is.na(value) & TP_flag != '' ~ TP_flag,
-                          parameter == 'H_M' & !is.na(value) & ph_flag != '' ~ ph_flag,
+  mutate(flag = NA_character_) %>% 
+  mutate(flag = case_when(parameter == 'TP_mgl' & TP_flag != '' ~ TP_flag,
+                          parameter == 'alk_mglCaCO3' & alk_flag != '' ~ alk_flag,
+                          parameter == 'cond_uScm' & cond_flag != '' ~ cond_flag,
+                          parameter == 'turb_NTU' & turb_flag != '' ~ turb_flag,
+                          parameter == 'turb_NTU' & gen_flag != '' & is.na(flag) ~ gen_flag,
+                          parameter == 'turb_NTU' & gen_flag != '' & !is.na(flag) ~ paste(gen_flag, flag, sep = '; '),
                           TRUE ~ '')) %>% 
-  select(-ph_flag, -TP_flag) %>% 
-  mutate(value = as.numeric(value))
+  select(-TP_flag,-alk_flag, -cond_flag, -turb_flag, -gen_flag) 
 
-
-ggplot(raw_chem_vert, aes(x = date, y = value, color = flag)) +
+#plot all data with flags
+ggplot(qaqc_chem_vert, aes(x = date, y = value, color = flag)) +
   geom_point() +
-  facet_grid(parameter~., scales = 'free_y') +
+  facet_grid(parameter~location, scales = 'free_y') +
   theme_bw()
 
-stream_chem_vert <- raw_chem_vert %>% 
-  mutate(station = as.numeric(station)) %>% 
-  filter(station > 230)
-unique(stream_chem_vert$station)
+#plot only stream data
+stream_chem_vert <- qaqc_chem_vert %>% 
+  filter(station > 230) %>% 
+  select(-depth_m, -layer)
 ggplot(stream_chem_vert, aes(x = date, y = value, color = flag)) +
   geom_point() +
   facet_grid(parameter~., scales = 'free_y') +
   theme_bw()
 
-lake_chem_vert <- raw_chem_vert %>% 
-  mutate(station = as.numeric(station)) %>% 
+#plot only lake data
+lake_chem_vert <- qaqc_chem_vert %>% 
   filter(station <= 230)
 unique(lake_chem_vert$station)
-ggplot(raw_chem_vert, aes(x = date, y = value, color = flag)) +
+ggplot(qaqc_chem_vert, aes(x = date, y = value, color = flag)) +
   geom_point() +
   facet_grid(parameter~., scales = 'free_y') +
   theme_bw()
 
-# export raw_chem
 
-write_csv(stream_chem_vert, 'master files/stream_chem_1986-2020_v01Mar2021.csv')
-write_csv(lake_chem_vert, 'master files/lake_chem_1986-2020_v01Mar2021.csv')
-write_csv(raw_chem, "master files/raw_chem_all_1986-2020_v01Mar2021.csv")
-
-
-
-#************************************************
-
-
-#### bio data ####
+# BIOLOGICAL DATA ####
 
 # import data
-raw_bio_2017 <- read_xlsx("raw data/LMP files/LMP 2017/BIOLOGY.xlsx", 
+raw_bio_2017 <- read_xlsx(paste0(datadir, "1986-2017/BIOLOGY.xlsx"), 
                            sheet="BIOLOGY",
-                           col_types = 'text',
-                          na = '-99') %>% 
+                           col_types = 'text') %>% 
   mutate(DATE = as.Date(as.numeric(DATE), origin = '1899-12-30'))
-raw_bio_2018 <- read_csv('raw data/LMP files/2018/Sunapee 2018 Bio.csv',
+
+raw_bio_2018 <- read_csv(paste0(datadir, "2018/Sunapee 2018 Bio.csv"),
                           col_types = cols(.default = col_character()),
                          na = '-99') %>% 
   mutate(DATE = as.Date(DATE, format = '%m/%d/%Y'))
-raw_bio_2019 <- read_csv('raw data/LMP files/2019/Sunapee2019Bio.csv',
+
+raw_bio_2019 <- read_csv(paste0(datadir,'2019/Sunapee2019Bio.csv'),
                          col_types = cols(.default = col_character()),
                          na = '-99')%>% 
   mutate(DATE = as.Date(DATE, format = '%d-%b-%y'))
-raw_bio_2020 <- read_csv('raw data/LMP files/2020/Sunapee2020BIO.csv',
+
+raw_bio_2020 <- read_csv(paste0(datadir,'2020/Sunapee2020BIO.csv'),
                          col_types = cols(.default = col_character()),
                          na = '-99')%>% 
   mutate(DATE = as.Date(DATE, format = '%d-%b-%y'))
+
 str(raw_bio_2017)
 str(raw_bio_2018)
 str(raw_bio_2019)
 str(raw_bio_2020)
 
+### collate bio data ####
 raw_bio <- full_join(raw_bio_2017, raw_bio_2018) %>% 
   full_join(., raw_bio_2019) %>% 
   full_join(., raw_bio_2020)
 head(raw_bio)
 
-#format bio columns to numeric
+# format bio columns to numeric
 raw_bio <- raw_bio %>% 
-  mutate_at(vars(CHL, SD, PCTPHY1, PCTPHY2, PCTPHY3),
+  mutate_at(vars(STATION, CHL, SD, PCTPHY1, PCTPHY2, PCTPHY3),
             ~ as.numeric(.))
 
 # remove unneeded variables and rename others
 raw_bio <- raw_bio %>% 
-  select(-"LAKE", -"TOWN", -"YEAR", -"MONTH", -'CompleteDate', -'SampleID', -'ID', - 'Date_Sta') %>% 
+  select(-"LAKE", -"TOWN", -"YEAR", -"MONTH", -'CompleteDate',- 'Date_Sta') %>% 
   rename(date = DATE,
          station =STATION,
          chla_ugl = CHL,
-         secchidepth_m = SD)
-str(raw_bio)
+         secchidepth_m = SD,
+         org_id = ID,
+         org_sampid = SampleID,
+         phyto_net_a = NETPHY1,
+         phyto_pct_a = PCTPHY1,
+         phyto_net_b = NETPHY2,
+         phyto_pct_b = PCTPHY2,
+         phyto_net_c = NETPHY3,
+         phyto_pct_c = PCTPHY3) %>% 
+  mutate(location = case_when(station <=230 ~ 'lake',
+                              station >230 ~ 'stream'))
+head(raw_bio)
 
-# format, QAQC and standardize variables
+### baseline cleanup and QAQC ####
 
-#chlorophyll-a
-range(raw_bio$chla_ugl, na.rm = T)
-raw_bio$chla_ugl [raw_bio$chla_ugl==-99.99] = NA
-raw_bio$chla_ugl [raw_bio$chla_ugl==-9.99] = NA
-range(raw_bio$chla_ugl, na.rm = T)
-#chl-a
-plot(raw_bio$date, raw_bio$chla_ugl)
+#save into new dataframe
+qaqc_bio <- raw_bio
+
+# filter out one oddball stream sample
+qaqc_bio <- qaqc_bio %>% 
+  filter(location == 'lake')
+
+##### chlorophyll-a #####
+range(qaqc_bio$chla_ugl, na.rm = T)
+qaqc_bio$chla_ugl [qaqc_bio$chla_ugl==-99.99] = NA
+range(qaqc_bio$chla_ugl, na.rm = T)
+qaqc_bio$chla_ugl [qaqc_bio$chla_ugl==-99] = NA
+range(qaqc_bio$chla_ugl, na.rm = T)
+qaqc_bio$chla_ugl [qaqc_bio$chla_ugl==-9.99] = NA
+range(qaqc_bio$chla_ugl, na.rm = T)
+
+# plot chl-a
+ggplot(qaqc_bio, aes(x = date, y = chla_ugl)) +
+  geom_point() +
+  facet_grid(station ~ .)
+
 #no anomolous points
-raw_bio$flag_chla <- NA_character_
-raw_bio$flag_chla [raw_bio$chla_ugl==0] = 'suspect'
+qaqc_bio$flag_chla <- ''
+qaqc_bio$flag_chla [qaqc_bio$chla_ugl<1] = 'likely BDL'
+qaqc_bio$flag_chla [qaqc_bio$chla_ugl==0] = 'suspect value'
 
-#secchi depth
-range(raw_bio$secchidepth_m, na.rm = T) 
-#secchi of 0 seems suspect
-plot(raw_bio$date, raw_bio$secchidepth_m)
+
+# plot chl-a with flags
+ggplot(qaqc_bio, aes(x = date, y = chla_ugl, color = flag_chla)) +
+  geom_point() +
+  facet_grid(station ~ .)
+
+
+##### secchi depth ####
+range(qaqc_bio$secchidepth_m, na.rm = T) 
+qaqc_bio$secchidepth_m [qaqc_bio$secchidepth_m==-99] = NA
+range(qaqc_bio$secchidepth_m, na.rm = T)
+#will need to flag secchi of 0
+
+# plot secchi
+ggplot(qaqc_bio, aes(x = date, y = secchidepth_m)) +
+  geom_point() 
 
 #remove anomolous point
-raw_bio$secchidepth_m [raw_bio$station==30 & raw_bio$date=="1999-07-15" & raw_bio$secchidepth_m>25] = NA #point deeper than maximum depth
-plot(raw_bio$date, raw_bio$secchidepth_m)
+qaqc_bio$secchidepth_m [qaqc_bio$station==30 & qaqc_bio$date=="1999-07-15" & qaqc_bio$secchidepth_m>25] = NA #point deeper than maximum depth
+plot(qaqc_bio$date, qaqc_bio$secchidepth_m)
 
-#flag secchi of 0
-raw_bio$flag_secchi <- NA_character_
-raw_bio$flag_secchi [raw_bio$secchidepth_m==0] = 'suspect'
+#plot again
+ggplot(qaqc_bio, aes(x = date, y = secchidepth_m)) +
+  geom_point() 
 
 
-# drop phyto data (there are only about 20 observations of phyto data) and create vertical dataset of clha and sd
-raw_bio_vert <- raw_bio %>% 
-  select(-(NETPHY1:PCTPHY3)) %>% 
-  gather(parameter, value, -station, -date, -flag_secchi, -flag_chla) %>% 
+#flag secchi of 0 and other repeated values
+qaqc_bio$flag_secchi <- ''
+qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==0] = 'suspect value'
+qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==2 & qaqc_bio$station == 80] = 'suspect value'
+qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==4 & (qaqc_bio$station == 20 | qaqc_bio$station == 60) ] = 'suspect value - possible bottom hit'
+qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==4.3 & qaqc_bio$station == 20] = 'suspect value - possible bottom hit'
+
+#and by station
+ggplot(qaqc_bio, aes(x=date, y=secchidepth_m)) +
+  geom_point() +
+  facet_grid(.~station) +
+  theme_bw()
+
+#recode value at site 20 > 10m - that is almost certainly a typo
+qaqc_bio$secchidepth_m [qaqc_bio$secchidepth_m>10 & qaqc_bio$station == 20] = NA
+
+
+#plot again with flags
+ggplot(qaqc_bio, aes(x = date, y = secchidepth_m, color = flag_secchi )) +
+  geom_point() 
+
+### phyto data into separate file (very few observations) ####
+phyto <- qaqc_bio %>% 
+  select(station, date, phyto_net_a:phyto_pct_c) %>% 
+  filter(!is.na(phyto_net_a))
+
+phyto_net = c('phyto_net_a', 'phyto_net_b', 'phyto_net_c')
+phyto_pct = c('phyto_pct_a', 'phyto_pct_b','phyto_pct_c')
+
+phyto <- phyto %>%
+  mutate_at(vars(all_of(phyto_pct)),
+            ~ case_when(phyto_pct_a < 0 ~ NA_real_,
+                        TRUE ~ .)) %>% 
+  filter(!is.na(phyto_pct_a))
+
+# export phytos
+firstsamp <- format(as.Date(min(phyto$date)), '%Y')
+lastsamp <- format(as.Date(max(phyto$date)), '%Y')
+write_csv(phyto, paste0(dumpdir, 'lake/phyto_', firstsamp, '_', lastsamp, '_v', Sys.Date(),'.csv'))
+
+### create vertical dataset for secchi and chla ####
+qaqc_bio_vert <- qaqc_bio %>% 
+  select(-(phyto_net_a:phyto_pct_c)) %>% 
+  gather(parameter, value, -station, -date, -org_id, -org_sampid, -flag_secchi, -flag_chla, -location) %>% 
   mutate(flag = case_when(parameter == 'chla_ugl' & !is.na(flag_chla) ~ flag_chla,
                           parameter == 'secchidepth_m' & !is.na(flag_secchi) ~ flag_secchi,
-                          TRUE ~ NA_character_)) %>% 
+                          TRUE ~ '')) %>% 
   select(-flag_secchi, -flag_chla)
-head(raw_bio_vert)
+head(qaqc_bio_vert)
 
-ggplot(raw_bio_vert, aes(x=date, y=value, color = flag)) +
+ggplot(qaqc_bio_vert, aes(x=date, y=value, color = flag)) +
   geom_point() +
   facet_grid(parameter~station) +
   theme_bw()
 
 # filter for deep spots
-raw_bio_deep <- raw_bio_vert %>% 
+qaqc_bio_deep <- qaqc_bio_vert %>% 
   filter(station == 200 | station == 210 | station == 220 | station == 230)
 
 #plot historical deep spot records
-ggplot(raw_bio_deep, aes(x=date, y=value, color = flag)) +
+ggplot(qaqc_bio_deep, aes(x=date, y=value, color = flag)) +
   geom_point() +
   facet_grid(parameter~station) +
   theme_bw()
 
 
-# export raw_bio
-write.csv(raw_bio_vert, file="master files/lake_bio_1986-2020_v01Mar2021.csv", row.names=F, na="")
 
+# DO data ####
 
-
-#### DO data ####
-raw_do_2017 <- read_xlsx("raw data/LMP files/LMP 2017/DO_BGSqaqc.xlsx", 
+# load files
+raw_do_2017 <- read_xlsx(paste0(datadir, "1986-2017/DO.xlsx"), 
                           sheet="DO",
                           col_types = 'text') %>% 
   mutate(DATE = as.Date(as.numeric(DATE), origin = '1899-12-30'))
-raw_do_2018 <- read_csv('raw data/LMP files/2018/Sunapee 2018 DO.csv',
+head(raw_do_2017)
+
+raw_do_2018 <- read_csv(paste0(datadir, "2018/Sunapee 2018 DO.csv"),
                          col_types = cols(.default = col_character())) %>% 
   mutate(DATE = as.Date(DATE, format = '%d-%b-%y'))
-raw_do_2019 <- read_csv('raw data/LMP files/2019/Sunapee2019DO.csv',
+head(raw_do_2018)
+
+raw_do_2019 <- read_csv(paste0(datadir, '2019/Sunapee2019DO.csv'),
                          col_types = cols(.default = col_character()),
                          col_names = c('DATE', 'TIME', 'STATION', 'SENSOR', 'TEMP', 'PCNTSAT','DO',  'DEPTH'),
                         skip = 1)%>% 
   mutate(DATE = as.Date(DATE, format = '%m/%d/%Y'))
-raw_do_2020 <- read_csv('raw data/LMP files/2020/Sunapee2020DO.csv',
+head(raw_do_2019)
+
+raw_do_2020 <- read_csv(paste0(datadir, '2020/Sunapee2020DO.csv'),
                         col_types = cols(.default = col_character()),
                         skip = 1,
                         col_names = c('LAKE', 'TOWN','STATION', 'DATE', 'DEPTH', 'TEMP', 'DO', 'PCNTSAT', 'SPC_USCM', 'PH', 'NTU', 'TIME', 'BOTTOMZ', 'WEATHER', 'COMMENTS', 'ID', 'DATESTAID'))%>% 
   mutate(DATE = as.Date(DATE, format = '%d-%b-%y'))
-str(raw_do_2017)
-str(raw_do_2018)
-str(raw_do_2019)
-str(raw_do_2020)
+head(raw_do_2020)
 
+#### collate do data ####
 raw_do <- full_join(raw_do_2017, raw_do_2018) %>% 
   full_join(., raw_do_2019) %>% 
   full_join(., raw_do_2020)
@@ -323,108 +472,286 @@ unique(raw_do$Comments)
 unique(raw_do$WEATHER)
 unique(raw_do$BOTTOMZ)
 
+#### pull out weather conditions ####
+weather_obs <- raw_do %>% 
+  select(DATE, STATION, WEATHER) %>% 
+  rename(date = DATE,
+         station = STATION,
+         weather = WEATHER)  %>% 
+  mutate(weather = case_when(grepl('not recorded', weather, ignore.case = T) ~ NA_character_,
+                             TRUE ~ weather)) %>% 
+  filter(!is.na(weather))
+
+#### pull out bottom z ####
+bottom_depth <- raw_do %>% 
+  select(DATE, STATION, BOTTOMZ) %>% 
+  rename(date = DATE,
+         station = STATION,
+         bottom_depth_m = BOTTOMZ) %>% 
+  mutate(bottom_depth_m = case_when(as.numeric(bottom_depth_m) <= 2.5 ~ NA_real_,
+                                    TRUE ~ as.numeric(bottom_depth_m))) %>% 
+  filter(!is.na(bottom_depth_m))
+
+ggplot(bottom_depth, aes(x = date, y = bottom_depth_m)) +
+  geom_point() +
+  facet_grid(station ~ .)
+
+#some of these look okay, but there are inconsistencies - not pushing these to the master file at this time.
+
 #select pertinent columns
-raw_do <- raw_do %>% 
-  select(STATION, DATE, DEPTH, TEMP, DO, PCNTSAT, SPC_USCM, PH, NTU, BOTTOMZ)
+qaqc_do <- raw_do %>% 
+  select(STATION, DATE, DEPTH, TEMP, DO, PCNTSAT, SPC_USCM, PH, NTU, ID)
 
 #format depth, temp, do columns to numeric
-raw_do <- raw_do %>% 
-  mutate_at(vars(DEPTH, TEMP, DO, PCNTSAT, SPC_USCM, PH, NTU, BOTTOMZ),
+qaqc_do <- qaqc_do %>% 
+  mutate_at(vars(DEPTH, TEMP, DO, PCNTSAT, SPC_USCM, PH, NTU),
             ~ as.numeric(.))
 
-#quick reality check for anamolous points
-range(raw_do$TEMP, na.rm = T)
-plot(raw_do$DATE, raw_do$TEMP)
+#### look at ranges and recode na and obviously errant data ####
+range(qaqc_do$TEMP, na.rm = T)
+# 0 is probably incorrect, will come back to this.
 
-#values where temp less than 4.5 in june and august seem errant, recode
-ix = which(raw_do$TEMP<4.5 & as.numeric(format(raw_do$DATE, '%m')) >=4 & as.numeric(format(raw_do$DATE, '%m')) <10)
+range(qaqc_do$DO, na.rm = T)
+#negative do needs to be recoded
+qaqc_do$DO [qaqc_do$DO < 0] = NA_real_
+range(qaqc_do$DO, na.rm = T)
+# high values are incorrect to, but need to see them in context.
 
-raw_do$TEMP[ix] = NA_real_
-plot(raw_do$DATE, raw_do$TEMP)
+range(qaqc_do$PCNTSAT, na.rm = T)
+#negative do needs to be recoded
+qaqc_do$PCNTSAT [qaqc_do$PCNTSAT < 0] = NA_real_
+range(qaqc_do$PCNTSAT, na.rm = T)
+#some really high values are impossible, need to see in context
 
+range(qaqc_do$NTU, na.rm = T)
+# recode negative values
+qaqc_do$NTU [qaqc_do$NTU < 0] = NA_real_
+range(qaqc_do$NTU, na.rm = T)
 
+range(qaqc_do$PH, na.rm = T)
 
+range(qaqc_do$SPC_USCM, na.rm = T)
 
-range(raw_do$DO, na.rm = T)
+#### plot to look at data ####
 
-#recode do and pctsat where raw do is 0 or less 
-raw_do <- raw_do %>% 
-  mutate_at(vars('DO', 'PCNTSAT'),
-            ~ case_when(DO <=0 ~ NA_real_,
-                        TRUE ~ .))
-range(raw_do$DO, na.rm = T)
-
-plot(raw_do$DATE, raw_do$DO)
-
-#recode those greater than 80 as NA
-raw_do$DO [raw_do$DO>80] = NA_real_
-plot(raw_do$DATE, raw_do$DO)
-
-
-range(raw_do$PCNTSAT, na.rm = T)
-plot(raw_do$DATE, raw_do$PCNTSAT)
-#recode those greater than 200 as NA
-raw_do$PCNTSAT [raw_do$PCNTSAT>200] = NA_real_
-plot(raw_do$DATE, raw_do$PCNTSAT)
-#flag those GT 120 as suspect
-raw_do$do_flag = NA_character_
-raw_do$do_flag [raw_do$PCNTSAT>140] = 'DO PCT >140'
-
-ggplot(raw_do, aes(x = DATE, y = DO, color = do_flag)) +
+##### do ####
+ggplot(qaqc_do, aes(x = DATE, y = DO)) +
   geom_point()
 
-#plot ph
-plot(raw_do$DATE, raw_do$PH)
-range(raw_do$PH, na.rm = T)
+#recode points above 75 - those are wrong, likely transcription errors
+qaqc_do$DO [qaqc_do$DO >75] = NA_real_
+ggplot(qaqc_do, aes(x = DATE, y = DO)) +
+  geom_point()
+#couple of oddballs, but look good other than that. 
+#plot by year, color by station
+years = seq(1986, 2020, by =1)
 
-#plot turb
-plot(raw_do$DATE, raw_do$NTU)
-range(raw_do$NTU, na.rm = T)
-#recode negative to NA
-raw_do$NTU [raw_do$NTU < 0] = NA_real_
-#LOOKS LIKE THERE ARE SOME PROBLEMATIC DATA HERE, LIKELY SONDE IS IN SEDIMENT where NTU > 150
-raw_do <- raw_do %>% 
-  mutate_at(vars(TEMP, DO, PCNTSAT, SPC_USCM, NTU, PH),
-            ~ case_when(NTU > 150 ~ NA_real_,
-                        TRUE ~ .)) %>% 
-  mutate(flag = case_when(NTU > 20 ~ 'sensor may be in sediment, turbidity > 20 NTU',
-                          TRUE ~ NA_character_))
-plot(raw_do$DATE, raw_do$NTU)
+#Set up pdf device
+pdf(file=paste0(figuredump, 'sunapee annual do.pdf'),width=11,height=8.5)
+par()
+for(i in 1:length(years)){
+  DF <- qaqc_do %>% 
+    filter(DATE >= paste(years[i], '01', '01', sep='-') &
+             DATE < paste(years[i]+1, '01', '01', sep='-'))
+  PLOT <- ggplot(DF, aes(x = DATE, y = DO, color = STATION)) +
+    geom_point() +
+    labs(title = years[i]) +
+    coord_cartesian(ylim = c(0,max(qaqc_do$DO, na.rm = T)))
+  print(PLOT)
+}
+dev.off()
+
+##### percent saturation ####
+ggplot(qaqc_do, aes(x = DATE, y = PCNTSAT)) +
+  geom_point()
+
+#percent saturation gt 250 are errant
+qaqc_do$PCNTSAT [qaqc_do$PCNTSAT>250] = NA_real_
+
+ggplot(qaqc_do, aes(x = DATE, y = PCNTSAT)) +
+  geom_point()
+
+# add flag to site 210 data on 1994-07-29 seems too high
+qaqc_do <- qaqc_do %>% 
+  mutate(do_flag = NA_character_,
+         do_flag = case_when(DATE == as.Date('1994-07-29') ~ 'possible do calibration issue on this date, do sat very high at 210',
+                             DATE == as.Date('2008-07-01') ~ 'possible do calibration issue on this date, do sat very high at 210',
+                             TRUE ~ '')) 
+ggplot(qaqc_do, aes(x = DATE, y = PCNTSAT, color = do_flag)) +
+  geom_point()
 
 
-# plot cond
-plot(raw_do$DATE, raw_do$SPC_USCM)
-range(raw_do$SPC_USCM, na.rm = T)
+##### temperature ####
+ggplot(qaqc_do, aes(x = DATE, y = TEMP)) +
+  geom_point()
+
+#values where temp less than 2 are incorrect, recoding the do data as well.
+ix = which(qaqc_do$TEMP<2)
+
+qaqc_do$TEMP[ix] = NA_real_
+qaqc_do$DO[ix] = NA_real_
+qaqc_do$PCNTSAT[ix] = NA_real_
+
+ggplot(qaqc_do, aes(x = DATE, y = TEMP)) +
+  geom_point()
+
+#recode oddball temp at site 200, 1999-06-28, 10m, <4 degC
+qaqc_do$TEMP [qaqc_do$TEMP < 4 & qaqc_do$STATION == 200 & qaqc_do$DEPTH == 10] = NA_real_
+
+ggplot(qaqc_do, aes(x = DATE, y = TEMP)) +
+  geom_point()
+
+##### pH ####
+ggplot(qaqc_do, aes(x = DATE, y = PH)) +
+  geom_point()
+# calculate H+ ion from pH (H+ = 10^-pH) and drop pH column
+qaqc_do$conc_H_molpl=10^(qaqc_do$PH * -1)
+qaqc_do$PH = NULL
+
+##### turbidity ####
+ggplot(qaqc_do, aes(x = DATE, y = NTU)) +
+  geom_point()
+
+#LOOKS LIKE THERE ARE SOME PROBLEMATIC DATA HERE, LIKELY SONDE IS IN SEDIMENT - want to look at these relative to the DO data to make sure those data are recoded properly.
 
 
-# rename columns
-raw_do <- raw_do %>% 
+##### conductivity ####
+ggplot(qaqc_do, aes(x = DATE, y = SPC_USCM)) +
+  geom_point()
+
+
+#### rename columns ####
+qaqc_do <- qaqc_do %>% 
   rename(station = STATION,
          depth_m = DEPTH,
          temp_C = TEMP,
          DO_mgl = DO,
          DO_pctsat = PCNTSAT,
          turb_NTU = NTU,
-         pH = PH,
-         cond_uscm = SPC_USCM,
-         date = DATE) %>% 
-  select(-BOTTOMZ)
-str(raw_do)
+         cond_uScm = SPC_USCM,
+         date = DATE,
+         org_id = ID)) %>% 
+  mutate(station = as.numeric(station))
+str(qaqc_do)
 
-#create vertical dataset
-raw_do_vert <- raw_do %>% 
-  gather(parameter, value, -station, -depth_m, -date, -do_flag, -flag)
+#### create vertical dataset ####
+qaqc_do_vert <- qaqc_do %>% 
+  gather(parameter, value, -station, -depth_m, -date, -do_flag, - org_id) %>% 
+  filter(!is.na(value)) %>% 
+  mutate(location = 'lake',
+         depth_m = round(depth_m, digits = 1)) %>% 
+  mutate(flag = NA_character_) %>% 
+  mutate(flag = case_when(parameter == 'DO_mgl' ~ do_flag,
+                          parameter == 'DO_pctsat' ~ do_flag,
+                          TRUE ~ '')) %>% 
+  select(-do_flag) 
 
-ggplot(raw_do_vert, aes(x = date, y = value, color = flag)) +
+ggplot(qaqc_do_vert, aes(x = date, y = value, color = flag)) +
   geom_point() +
   facet_grid(parameter ~ station, scales = 'free_y') +
   theme_bw()
 
-ggplot(raw_do_vert, aes(x = date, y = value, color = do_flag)) +
-  geom_point() +
-  facet_grid(parameter ~ station, scales = 'free_y') +
-  theme_bw()
+# JOIN AND HARMONIZE ALL DATA ####
+head(qaqc_chem_vert)
+unique(qaqc_chem_vert$parameter)
+head(qaqc_bio_vert)
+unique(qaqc_bio_vert$parameter)
+head(qaqc_do_vert)
+unique(qaqc_do_vert$parameter)
 
-# export raw_do
-write.csv(raw_do_vert, file="master files/raw_do_1986-2020_v01Mar2021.csv.csv", row.names=F, na="")
+master_file_vert <- full_join(qaqc_chem_vert, qaqc_bio_vert) %>% 
+  full_join(., qaqc_do_vert) %>% 
+  mutate(station = as.character(station)) %>% 
+  filter(station != '999')
+
+head(qaqc_chem)
+head(qaqc_bio)
+head(qaqc_do)
+
+master_file_flat <- full_join(qaqc_chem, qaqc_bio) %>% 
+  full_join(., qaqc_do) %>% 
+  mutate(depth_m = round(depth_m, digits = 1))
+
+unique(master_file$parameter)
+unique(master_file$location)
+
+master_file_stream <- master_file %>% 
+  filter(location == 'stream') 
+master_file_lake <- master_file %>% 
+  filter(location == 'lake')
+
+#### qaqc with whole dataset ####
+# plot turbidity and do together
+lake_do <- master_file_lake %>% 
+  filter(parameter == 'DO_mgl') %>% 
+  rename(DO_mgl = value,
+         do_flag = flag) %>% 
+  select(-parameter, -layer, - org_id, -org_sampid)
+lake_dosat<- master_file_lake %>% 
+  filter(parameter == 'DO_pctsat') %>% 
+  rename(DO_pctsat = value,
+         dosat_flag = flag) %>% 
+  select(-parameter, -layer, - org_id, -org_sampid)
+lake_turb<- master_file_lake %>% 
+  filter(parameter == 'turb_NTU') %>% 
+  rename(turb_NTU = value,
+         turb_flag = flag) %>% 
+  select(-parameter, -layer, - org_id, -org_sampid)
+do_turb <- full_join(lake_do, lake_dosat) %>% 
+  full_join(., lake_turb)
+
+do_turb %>% 
+  filter(date >= as.Date('2001-01-01')) %>% 
+  filter(station == 200 | station == 210 | station == 220 | station == 230) %>%
+  ggplot(., aes(x = date, y = DO_mgl,color = station)) +
+  geom_point(aes(size = turb_NTU)) +
+  scale_size(breaks = c(0, 10, 30, 50, 100, 310)) 
+ggsave(paste0(figuredump, 'do and turbidity whole record.png'), height = 6, width = 10)
+
+do_turb %>% 
+  filter(date >= as.Date('2020-01-01')) %>% 
+  filter(station == 200 | station == 210 | station == 220 | station == 230) %>%
+  ggplot(., aes(x = date, y = DO_mgl,color = station, size = turb_NTU)) +
+  geom_point() +
+  scale_size(breaks = c(0, 10, 30, 50, 100, 310)) 
+ggsave(paste0(figuredump, 'do and turbidity 2020.png'), height = 6, width = 10)
+
+years_doturb = seq(2001, 2020, by = 1)
+
+pdf(file=paste0(figuredump, 'annual do and turbidity by year.pdf'),width=11,height=8.5)
+par()
+for(i in 1:length(years_doturb)) {
+  PLOT <- do_turb %>% 
+    filter(as.numeric(station) >= 200) %>% 
+    filter(date >= as.Date(paste(years_doturb[i], '01', '01', sep='-')) &
+             date < as.Date(paste(years_doturb[i]+1, '01', '01', sep='-'))) %>% 
+    ggplot(., aes(x = date, y = DO_mgl, size = turb_NTU)) +
+    geom_point()+
+    facet_grid(station ~ .) +
+    theme(legend.position = 'bottom') +
+    labs(title = years_doturb[i])
+  print(PLOT)
+}
+dev.off()
+
+do_turb %>% 
+  filter(as.numeric(station) >= 200) %>% 
+  ggplot(., aes(x = date, y = DO_pctsat, size = turb_NTU, color = station)) +
+  geom_point()
+
+#### plot the data together ####
+lakevars = unique(master_file_lake$parameter)
+pdf(file=paste0(figuredump, 'sunapee whole record by parameter.pdf'),width=11,height=8.5)
+par()
+for(i in 1:length(lakevars)) {
+  DF <- master_file_lake %>% 
+    filter(parameter == lakevars[i])
+  PLOT <- ggplot(DF, aes(x = date, y = value, color = station, shape = flag)) +
+    geom_point() +
+    facet_grid(parameter ~ ., scales = 'free_y') +
+    theme(legend.position = 'bottom')
+  print(PLOT)
+}
+dev.off()
+
 
