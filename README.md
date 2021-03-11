@@ -17,7 +17,7 @@ This repository is maintained by B. Steele of the Cary Institute of Ecosystem St
 
 # Lake Sunapee Watershed and Sampling sites
 
-[Lake Sunapee Watershed and Sampling sites](Lake-Sunapee-Protective-Association.github.com/LMP/master files/LMP sampling map.jpg)
+[Lake Sunapee Watershed and Sampling sites](http://Lake-Sunapee-Protective-Association.github.com/LMP/master files/LMP sampling map.jpg)
 
 # Data organization
 
