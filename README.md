@@ -15,6 +15,9 @@ data questions: lspa@lakesunapee.org
 
 This repository is maintained by B. Steele of the Cary Institute of Ecosystem Studies (steeleb@caryinstitute.org). 
 
+# Lake Sunapee Watershed and Sampling sites
+
+[Lake Sunapee Watershed and Sampling sites](Lake-Sunapee-Protective-Association.github.com/LMP/master files/LMP sampling map.jpg)
 
 # Data organization
 
@@ -28,7 +31,7 @@ These data were obtained by request from the LSPA and are archived at the New Ha
 
 This folder contains the code used to collate and QAQC the data (where needed) to recode obviously errant data. Data from multiple files in the 'raw data files' folder are collated in this script.
 
-## MASTER FILES
+## master files
 
 These are the harmonized, collated data that should be used by other researchers. Proper citation is required.
 
