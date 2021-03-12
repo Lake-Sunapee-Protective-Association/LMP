@@ -2,7 +2,7 @@
 
 This repository contains the raw [Lake Sunapee Protective Association (LSPA)](https://www.lakesunapee.org/) Longterm Monitoring Program (LMP) data and collation scripts for all data collected by the LSPA in the watershed 1986-2020.
 
-These data use the ODC Open Database License v1.0, see *ODC license.txt* for details on use and reuse. In addition, we invite you to contact the data owner (the LSPA) with any questions or concerns. Please cite data using the Zenodo DOI associated with this repository 10.5281/zenodo.4599208.
+These data use the ODC Open Database License v1.0, see *ODC license.txt* for details on use and reuse. In addition, we invite you to contact the data owner (the LSPA) with any questions or concerns. Please cite data using the Zenodo DOI associated with this repository 10.5281/zenodo.XXX.
 
 Suggested citation for the MASTER FILES:
 **xxx; doi:xxx**
