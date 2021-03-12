@@ -19,15 +19,12 @@ This repository is maintained by B. Steele of the Cary Institute of Ecosystem St
 
 Below is a map of Lake Sunapee, the lake's watershed, and the sampling sites referenced in these data:
 
-![Lake Sunapee Watershed and Sampling sites](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/LMP%20sampling%20map.jpg)
+![Lake Sunapee Watershed and Sampling sites](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/LMP%20sampling%20map%20v2.jpg)
 
 # Data organization
 
-## [raw data files](https://github.com/Lake-Sunapee-Protective-Association/LMP/tree/main/raw%20data%20files)
+How files are organized within this repository
 
-This folder contains the original collated data files from the LSPA that are organized for integration into the NH Volunteer Lake Assessment Program (VLAP) database. Files have come directly from the LSPA and may contain QAQC errors. These data are stored here for the purposes of transparency and processing, please use the files in the 'MASTER FILES' folder instead of these. For questions about the QAQC process from the raw files, please contact Bethel Steele (steeleb@caryinstitute.org) for information. All QAQC of these files are performed in the R scripts found in the 'collation code' folder.
-
-These data were obtained by request from the LSPA and are archived at the New Hampshire Department of Environmental Services (NHDES) Environmental Monitoring Database (data are also available upon request from the NHDES).
 
 ## [collation code](https://github.com/Lake-Sunapee-Protective-Association/LMP/tree/main/collation%20code)
 
@@ -36,6 +33,12 @@ This folder contains the code used to collate and QAQC the data (where needed) t
 ## [master files](https://github.com/Lake-Sunapee-Protective-Association/LMP/tree/main/master%20files)
 
 These are the harmonized, collated data that should be used by other researchers. Proper citation is required.
+
+## [raw data files](https://github.com/Lake-Sunapee-Protective-Association/LMP/tree/main/raw%20data%20files)
+
+This folder contains the original collated data files from the LSPA that are organized for integration into the NH Volunteer Lake Assessment Program (VLAP) database. Files have come directly from the LSPA and may contain QAQC errors. These data are stored here for the purposes of transparency and processing, please use the files in the 'MASTER FILES' folder instead of these. For questions about the QAQC process from the raw files, please contact Bethel Steele (steeleb@caryinstitute.org) for information. All QAQC of these files are performed in the R scripts found in the 'collation code' folder.
+
+These data were obtained by request from the LSPA and are archived at the New Hampshire Department of Environmental Services (NHDES) Environmental Monitoring Database (data are also available upon request from the NHDES).
 
 
 # Data status
