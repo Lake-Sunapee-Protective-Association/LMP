@@ -19,7 +19,7 @@
 
 # store data directories
 datadir = 'raw data files/'
-dumpdir = 'MASTER FILES/'
+dumpdir = 'master files/'
 figuredump = 'collation code/tempfigs/'
 
 library(tidyverse) #v1.3.0
@@ -83,7 +83,7 @@ raw_chem <- raw_chem %>%
          cl_mgl = Chloride,
          org_id = ID,
          org_sampid = 'SampleID') %>% 
-  mutate(location = case_when(station <=230 ~ 'lake',
+  mutate(site_type = case_when(station <=230 ~ 'lake',
                               station >230 ~ 'stream'))
 str(raw_chem)
 
@@ -100,8 +100,8 @@ qaqc_chem$layer [qaqc_chem$layer=="N"] = ""
 qaqc_chem$layer [qaqc_chem$layer=="5"] = ""
 
 #recode depth and layer for stream samples
-qaqc_chem$depth_m [qaqc_chem$location=="stream"] = NA_real_
-qaqc_chem$layer [qaqc_chem$location=="stream"] = ""
+qaqc_chem$depth_m [qaqc_chem$site_type=="stream"] = NA_real_
+qaqc_chem$layer [qaqc_chem$site_type=="stream"] = ""
 
 
 ### look at ranges and recode data that are obviously NA or errant ####
@@ -148,15 +148,15 @@ range(qaqc_chem$cl_mgl, na.rm = T)
 ### plot to check for funky values ####
 #### ph ####
 ggplot(qaqc_chem, aes(x = date, y = pH)) +
-  facet_grid(location~. ) +
+  facet_grid(site_type~. ) +
   geom_point()
 #recode the data in lake above 10
 qaqc_chem$pH [qaqc_chem$pH>10] = NA
-qaqc_chem$ph_flag [qaqc_chem$pH<5 & location == 'lake'] = 'suspect'
+qaqc_chem$ph_flag [qaqc_chem$pH<5 & site_type == 'lake'] = 'suspect'
 
 #replot
 ggplot(qaqc_chem, aes(x = date, y = pH, color = depth_m)) +
-  facet_grid(location~. ) +
+  facet_grid(site_type~. ) +
   geom_point(aes(shape = layer))
 # calculate H+ ion from pH (H+ = 10^-pH) and drop pH column
 qaqc_chem$conc_H_molpl=10^(qaqc_chem$pH * -1)
@@ -165,22 +165,22 @@ qaqc_chem$pH = NULL
 
 #### alk ####
 ggplot(qaqc_chem, aes(x = date, y = alk_mglCaCO3, color = depth_m)) +
-  facet_grid(location~. ) +
+  facet_grid(site_type~. ) +
   geom_point(aes(shape = layer))
 #flag 0 values as well as in-lake values >9
 qaqc_chem <- qaqc_chem %>% 
   mutate(alk_flag = case_when(alk_mglCaCO3 == 0 ~ 'suspect',
-                              alk_mglCaCO3 > 9 & location == 'lake' ~ 'suspect',
+                              alk_mglCaCO3 > 9 & site_type == 'lake' ~ 'suspect',
                               TRUE ~ ''))
 #### TP ####
 ggplot(qaqc_chem, aes(x = date, y = TP_mgl, color = depth_m)) +
-  facet_grid(location~. , scales = 'free_y') +
+  facet_grid(site_type~. , scales = 'free_y') +
   geom_point(aes(shape = layer))
 #looks good
 
 #### cond ####
 ggplot(qaqc_chem, aes(x = date, y = cond_uScm, color = depth_m)) +
-  facet_grid(location~. , scales = 'free_y') +
+  facet_grid(site_type~. , scales = 'free_y') +
   geom_point(aes(shape = layer))
 
 #remove anomolous point above 2500
@@ -188,22 +188,22 @@ qaqc_chem$cond_uScm [qaqc_chem$cond_uScm>2500] = NA
 
 #flag values below 25 in lake
 qaqc_chem <- qaqc_chem %>% 
-  mutate(cond_flag = case_when(cond_uScm < 25 & location == 'lake' ~ 'suspect', 
+  mutate(cond_flag = case_when(cond_uScm < 25 & site_type == 'lake' ~ 'suspect', 
                                TRUE ~ ''))
 
 #### turbidity ####
 ggplot(qaqc_chem, aes(x = date, y = turb_NTU, color = depth_m)) +
-  facet_grid(location~. , scales = 'free_y') +
+  facet_grid(site_type~. , scales = 'free_y') +
   geom_point(aes(shape = layer))
 #flag in-lake above 30 and stream > 500 
 qaqc_chem <- qaqc_chem %>% 
-  mutate(turb_flag = case_when(turb_NTU >30 & location == 'lake' ~ 'suspect unless recent storm', 
-                               turb_NTU >500 & location == 'stream' ~ 'suspect unless recent storm', 
+  mutate(turb_flag = case_when(turb_NTU >30 & site_type == 'lake' ~ 'suspect unless recent storm', 
+                               turb_NTU >500 & site_type == 'stream' ~ 'suspect unless recent storm', 
                                TRUE ~ ''))
 
 #### chloride ####
 ggplot(qaqc_chem, aes(x = date, y = cl_mgl, color = depth_m)) +
-  facet_grid(location~. , scales = 'free_y') +
+  facet_grid(site_type~. , scales = 'free_y') +
   geom_point(aes(shape = layer))
 
 # look at comments
@@ -219,7 +219,7 @@ qaqc_chem <- qaqc_chem %>%
 colnames(qaqc_chem)
 qaqc_chem_vert <- qaqc_chem %>% 
   select(-Comments) %>% 
-  gather(parameter, value, -station, -layer, -depth_m, -date, -TP_flag, -alk_flag, -cond_flag, -turb_flag, -gen_flag, -org_id, -org_sampid, -location) %>% 
+  gather(parameter, value, -station, -layer, -depth_m, -date, -TP_flag, -alk_flag, -cond_flag, -turb_flag, -gen_flag, -org_id, -org_sampid, -site_type) %>% 
   filter(!is.na(value)) %>% 
   mutate(flag = NA_character_) %>% 
   mutate(flag = case_when(parameter == 'TP_mgl' & TP_flag != '' ~ TP_flag,
@@ -234,7 +234,7 @@ qaqc_chem_vert <- qaqc_chem %>%
 #plot all data with flags
 ggplot(qaqc_chem_vert, aes(x = date, y = value, color = flag)) +
   geom_point() +
-  facet_grid(parameter~location, scales = 'free_y') +
+  facet_grid(parameter~site_type, scales = 'free_y') +
   theme_bw()
 
 #plot only stream data
@@ -310,7 +310,7 @@ raw_bio <- raw_bio %>%
          phyto_pct_b = PCTPHY2,
          phyto_net_c = NETPHY3,
          phyto_pct_c = PCTPHY3) %>% 
-  mutate(location = case_when(station <=230 ~ 'lake',
+  mutate(site_type = case_when(station <=230 ~ 'lake',
                               station >230 ~ 'stream'))
 head(raw_bio)
 
@@ -321,7 +321,7 @@ qaqc_bio <- raw_bio
 
 # filter out one oddball stream sample
 qaqc_bio <- qaqc_bio %>% 
-  filter(location == 'lake')
+  filter(site_type == 'lake')
 
 ##### chlorophyll-a #####
 range(qaqc_bio$chla_ugl, na.rm = T)
@@ -406,12 +406,12 @@ phyto <- phyto %>%
 # export phytos
 firstsamp <- format(as.Date(min(phyto$date)), '%Y')
 lastsamp <- format(as.Date(max(phyto$date)), '%Y')
-write_csv(phyto, paste0(dumpdir, 'lake/phyto_', firstsamp, '_', lastsamp, '_v', Sys.Date(),'.csv'))
+#write_csv(phyto, paste0(dumpdir, 'lake/phyto_', firstsamp, '_', lastsamp, '_v', Sys.Date(),'.csv'))
 
 ### create vertical dataset for secchi and chla ####
 qaqc_bio_vert <- qaqc_bio %>% 
   select(-(phyto_net_a:phyto_pct_c)) %>% 
-  gather(parameter, value, -station, -date, -org_id, -org_sampid, -flag_secchi, -flag_chla, -location) %>% 
+  gather(parameter, value, -station, -date, -org_id, -org_sampid, -flag_secchi, -flag_chla, -site_type) %>% 
   mutate(flag = case_when(parameter == 'chla_ugl' & !is.na(flag_chla) ~ flag_chla,
                           parameter == 'secchidepth_m' & !is.na(flag_secchi) ~ flag_secchi,
                           TRUE ~ '')) %>% 
@@ -630,7 +630,7 @@ qaqc_do <- qaqc_do %>%
          turb_NTU = NTU,
          cond_uScm = SPC_USCM,
          date = DATE,
-         org_id = ID)) %>% 
+         org_id = ID) %>% 
   mutate(station = as.numeric(station))
 str(qaqc_do)
 
@@ -638,7 +638,7 @@ str(qaqc_do)
 qaqc_do_vert <- qaqc_do %>% 
   gather(parameter, value, -station, -depth_m, -date, -do_flag, - org_id) %>% 
   filter(!is.na(value)) %>% 
-  mutate(location = 'lake',
+  mutate(site_type = 'lake',
          depth_m = round(depth_m, digits = 1)) %>% 
   mutate(flag = NA_character_) %>% 
   mutate(flag = case_when(parameter == 'DO_mgl' ~ do_flag,
@@ -672,13 +672,13 @@ master_file_flat <- full_join(qaqc_chem, qaqc_bio) %>%
   full_join(., qaqc_do) %>% 
   mutate(depth_m = round(depth_m, digits = 1))
 
-unique(master_file$parameter)
-unique(master_file$location)
+unique(master_file_vert$parameter)
+unique(master_file_vert$site_type)
 
-master_file_stream <- master_file %>% 
-  filter(location == 'stream') 
-master_file_lake <- master_file %>% 
-  filter(location == 'lake')
+master_file_stream <- master_file_vert %>% 
+  filter(site_type == 'stream') 
+master_file_lake <- master_file_vert %>% 
+  filter(site_type == 'lake')
 
 #### qaqc with whole dataset ####
 # plot turbidity and do together
@@ -755,3 +755,95 @@ for(i in 1:length(lakevars)) {
 dev.off()
 
 
+# COLLATE STATION LOCATIONS AND CREATE PARAMETER SUMMARIES ####
+
+#create master list of stations in the master file
+station <- unique(master_file_vert$station) 
+station <- tibble(station)
+
+#add stream/lake identifier as well as site type and sub type for lake sites
+station_details <- station %>% 
+  mutate(station = as.numeric(station)) %>% 
+  mutate(site_type = case_when((station) <= 230 ~ 'lake',
+                              TRUE ~ 'stream')) %>% 
+  mutate(sub_site_type = case_when(site_type == 'lake' & (station) >=200 ~ 'deep',
+                                   site_type == 'lake' & station <200 ~ 'cove',
+                                   TRUE ~ '')) 
+
+# make a summary of first sample, last sample per parameter per site, export as summary file in master files
+parameter_summary <- master_file_vert %>% 
+  group_by(station, parameter) %>% 
+  summarize(first_sample = min(date),
+            last_sample = max(date),
+            n_obs = length(value)) %>% 
+  mutate(station = as.numeric(station)) %>% 
+  full_join(station_details)
+
+write_csv(parameter_summary, paste0(dumpdir, 'parameter_by_site_sample_summary.csv'))
+
+
+# summarize year of first and last sample by station to summarize station status
+station_summary <- master_file_vert %>% 
+  group_by(station) %>% 
+  summarize(first_year = as.numeric(format(min(date), '%Y')),
+            last_year = as.numeric(format(max(date), '%Y'))) %>% 
+  mutate(station = as.numeric(station))
+
+station_details <- full_join(station_details, station_summary) %>% 
+  mutate(status = case_when(last_year >= 2020 ~ 'ongoing',
+                            TRUE ~ 'inactive'),
+         status = case_when(first_year == 2020 ~ 'temporary',
+                            TRUE ~ status))
+
+#add lat long information as available
+templake <- read_csv(paste0(datadir, 'station locations/VLAP_LS_AddedDeepStations2020.csv'))
+tempstream <- read_csv(paste0(datadir, 'station locations/VLAP_LS_AddedTribStations2020.csv'))
+stream <- read_xls(paste0(datadir, 'station locations/tributary_pts_alt.xls')) %>% 
+  select(stream_no, lat_dd, lon_dd) %>% 
+  rename(station = stream_no)  %>% 
+  mutate(lat_dd = round(lat_dd, digits = 4),
+         lon_dd = round(lon_dd, digits = 4))
+lake <- read_xls(paste0(datadir, 'station locations/Cove  Deep + Buoy WQ Sample Point GPS Coordinates.xls'),
+                 skip = 3) %>% 
+  mutate(station = as.numeric(WAYPOINT)) %>% #warnings okay - this is intentional character -> numeric
+  filter(!is.na(station)) %>% 
+  mutate(lat_dd = round(Y, digits = 4),
+         lon_dd = round(X, digits = 4)) %>% 
+  select(station, lat_dd, lon_dd)
+  
+temp <- full_join(templake, tempstream) %>% 
+  select(AliasID, LATDECDEG, LONGDECDEG) %>% 
+  rename(station = AliasID, 
+         lat_dd = LATDECDEG,
+         lon_dd = LONGDECDEG) %>% 
+  mutate(lat_dd = round(lat_dd, digits = 4),
+         lon_dd = round(lon_dd, digits = 4))
+
+station_locs <- full_join(stream, lake) %>% 
+  full_join(temp)
+
+station_details <- full_join(station_details, station_locs)
+
+#now bring in historical site locations from OneStop (NHDES Onestop Mapper)
+onestop <- read_delim(paste0(datadir, 'station locations/VLAP_LS_allinWS.txt'), delim = ',') %>%
+  filter(startsWith(STATNAME,'SUNAPEE LAKE'))
+onestop <- onestop %>% 
+  mutate(site_char = substr(STATNAME, 14, 20)) %>% 
+  mutate(site_num = as.numeric(site_char)) %>% 
+  mutate(site_num = case_when(is.na(site_num) ~ as.numeric(substr(site_char, 1, 4)),
+                              TRUE~ site_num)) %>% 
+  filter(!is.na(site_num)) %>% 
+  select(site_num, LONGITUDE, LATITUDE) %>% 
+  rename(station = site_num) %>% 
+  mutate(LONGITUDE = round(LONGITUDE, digits = 4),
+         LATITUDE = round(LATITUDE, digits = 4))
+
+station_details <- full_join(station_details, onestop) %>% 
+  mutate(lat_dd = case_when(is.na(lat_dd) ~ LATITUDE,
+                            TRUE ~ lat_dd),
+         lon_dd = case_when(is.na(lon_dd) ~ LONGITUDE,
+                            TRUE ~ lon_dd)) %>% 
+  select(-LATITUDE, -LONGITUDE) %>% 
+  filter(!is.na(site_type))
+
+write_csv(station_details, paste0(dumpdir, 'station_location_details.csv'))
