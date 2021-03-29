@@ -14,32 +14,32 @@ This is the collated file of all LSPA LMP data as collated and QAQC'd in the cod
 | 	----			|	----																		|	----	|	----	|
 |	station	|	station identifier, see [station_location_details.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/station_location_details.csv) for location lat-longs	|	*N/A*	|	numeric	|
 |	date	|	date of observation, measurement, or sample	|	*N/A*	|	YYYY-MM-DD	|
-|	depth_m	|	depth of observation, measurement, or sample	|	meters	|	numeric	|
-|	layer	|	layer from with an observation, measurement, or sample was taken	|	I = integrated, E = epilimnion, M = metalimnion, H = hypolimnion	|	character	|
+|	depth_m	|	depth of observation, measurement, or sample if applicable	|	meters	|	numeric	|
+|	layer	|	layer from which an observation, measurement, or sample was taken if applicable	|	I = integrated, E = epilimnion, M = metalimnion, H = hypolimnion	|	character	|
 |	site_type	|	indication of 'lake' site or 'stream' site	|	*N/A*	| character string	|
 |	parameter	| 	parameter for which value is reported, see table below for parameter descriptions and units	|	*N/A*	|	character string	|
-|	value	|	value of the parameter measured at station on date at depth_m or layer	|
+|	value	|	value of the parameter measured at station on date at depth_m or layer	|	various, see parameter units below	|	numeric	|
 |	flag	|	use flag for parameter value reported	|	*N/A*	|	character string, 'BDL' = 'below detection limit', all flags indicate use-with-caution	|	
 |	org_sampid	|	where 'SampleID' was listed in the original raw data file, it was copied to this column	|	*N/A*	|	character	|	
 |	org_id	|	where 'ID' was listed in the original raw data file, it was copied to this column	|	*N/A*	|	character	|
 
 
 Additional information for the parameter column:
-| 	Parameter Name	|	Parameter Description							|	Parameter Units	|	instrument	|	lab	|
+| 	Parameter Name	|	Parameter Description							|	Parameter Units	|	instrument	|	location of measurement	|
 | 	----			|	----											|	----	| 	----	|	----	|
 |	alk_mglCaCO3	|	water alkalinity								| 	milligramsPerLiter |	VWR SympHony B10P	|	CSC	|
 |	chla_ugl		|	concentration of chlorophyll-*a* in water		|	microgramsPerLiter	|	ThermoScientific Genesys 30	|	CSC	|
 |	cl_mgl			|	concentration of chloroide in water				|	milligramsPerLiter	|	Orion VersaStar Pro Meter	|	CSC	|
 |	conc_H_molpL	|	concentration of hydrogen ions in water			|	molesPerLiter	|	VWR SympHony B10P (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
 |	cond_uScm		|	conductivity of water							|	microSiemensPerCentimeter	|	Orion 3Star Meter (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
-|	secchidepth_m	|	secchi depth									| 	meters	|	---	|
+|	secchidepth_m	|	Secchi depth									| 	meters	|	Secchi disc	|	*in-situ*	|
 |	TP_mgl			| 	concentration of total phosphorus in water		|	milligramsPerLiter	|	ThermoScientific Genesys 30	|
-|	turb_NTU		|	turbidity of water								|	nephelometricTurbidityUnit	|	 HF Scientific Micro 100	|	CSC, then *in-situ*	|
-|	DO_mgl			|	dissolved oxygen concentration in water			| 	milligramsPerLiter	|	sonde	|	*in-situ*	|
-|	DO_pctsat		|	dissolved oxygen saturation in water			| 	percent	|	sonde	|	*in-situ*	|
-|	temp_C			|	temperature of water							|	degreesCelsius	|	sonde	|	*in-situ*	|
+|	turb_NTU		|	turbidity of water								|	nephelometricTurbidityUnit	|	 HF Scientific Micro 100 (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
+|	DO_mgl			|	dissolved oxygen concentration in water			| 	milligramsPerLiter	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
+|	DO_pctsat		|	dissolved oxygen saturation in water			| 	percent	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
+|	temp_C			|	temperature of water							|	degreesCelsius	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
 
-Sample analysis methodology questions should be directed to the LSPA.
+Sample analysis methodology questions should be directed to the LSPA. 'CSC' = LSPA lab at Colby Sawyer College
 
 #### [station_location_details.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/station_location_details.csv)
 
@@ -75,21 +75,21 @@ This file contains a brief summary of when/how long each parameter was measured 
 
 
 Additional information for the parameter column:
-| 	Parameter Name	|	Parameter Description							|	Parameter Units	|	instrument	|	lab	|
+| 	Parameter Name	|	Parameter Description							|	Parameter Units	|	instrument	|	location of measurement	|
 | 	----			|	----											|	----	| 	----	|	----	|
 |	alk_mglCaCO3	|	water alkalinity								| 	milligramsPerLiter |	VWR SympHony B10P	|	CSC	|
 |	chla_ugl		|	concentration of chlorophyll-*a* in water		|	microgramsPerLiter	|	ThermoScientific Genesys 30	|	CSC	|
 |	cl_mgl			|	concentration of chloroide in water				|	milligramsPerLiter	|	Orion VersaStar Pro Meter	|	CSC	|
 |	conc_H_molpL	|	concentration of hydrogen ions in water			|	molesPerLiter	|	VWR SympHony B10P (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
 |	cond_uScm		|	conductivity of water							|	microSiemensPerCentimeter	|	Orion 3Star Meter (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
-|	secchidepth_m	|	secchi depth									| 	meters	|	---	|
+|	secchidepth_m	|	Secchi depth									| 	meters	|	Secchi disc	|	*in-situ*	|
 |	TP_mgl			| 	concentration of total phosphorus in water		|	milligramsPerLiter	|	ThermoScientific Genesys 30	|
-|	turb_NTU		|	turbidity of water								|	nephelometricTurbidityUnit	|	 HF Scientific Micro 100	|	CSC, then *in-situ*	|
-|	DO_mgl			|	dissolved oxygen concentration in water			| 	milligramsPerLiter	|	sonde	|	*in-situ*	|
-|	DO_pctsat		|	dissolved oxygen saturation in water			| 	percent	|	sonde	|	*in-situ*	|
-|	temp_C			|	temperature of water							|	degreesCelsius	|	sonde	|	*in-situ*	|
+|	turb_NTU		|	turbidity of water								|	nephelometricTurbidityUnit	|	 HF Scientific Micro 100 (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
+|	DO_mgl			|	dissolved oxygen concentration in water			| 	milligramsPerLiter	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
+|	DO_pctsat		|	dissolved oxygen saturation in water			| 	percent	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
+|	temp_C			|	temperature of water							|	degreesCelsius	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
 
-Sample analysis methodology questions should be directed to the LSPA.
+Sample analysis methodology questions should be directed to the LSPA. 'CSC' = LSPA lab at Colby Sawyer College
 
 
 #### [weather_observations.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/weather_observations.csv)
