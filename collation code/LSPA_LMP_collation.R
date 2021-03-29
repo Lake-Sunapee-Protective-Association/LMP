@@ -6,7 +6,7 @@
 #* TITLE:   LSPA_LMP_collation.R                                 *
 #* AUTHOR:  Bethel Steele steeleb@caryinstitute.org              *
 #* RStudio version: 1.4.1103                                     *
-#* R version: 4.0.3                                              *
+#* R version: 4.0.4                                              *
 #* PURPOSE: Collate long term records of monitoring data         *
 #*          collected in Lake Sunapee                            *
 #* LAST UPDATE: v08Mar2021 - update in Git                       *
@@ -481,6 +481,12 @@ weather_obs <- raw_do %>%
   mutate(weather = case_when(grepl('not recorded', weather, ignore.case = T) ~ NA_character_,
                              TRUE ~ weather)) %>% 
   filter(!is.na(weather))
+weather_obs <- unique(weather_obs) %>% 
+  arrange(date) %>% 
+  mutate(source = 'DO/Temperature record')
+
+write_csv(weather_obs, paste0(dumpdir, 'weather_observations.csv'))
+  
 
 #### pull out bottom z ####
 bottom_depth <- raw_do %>% 
@@ -543,6 +549,7 @@ qaqc_do$DO [qaqc_do$DO >75] = NA_real_
 ggplot(qaqc_do, aes(x = DATE, y = DO)) +
   geom_point()
 #couple of oddballs, but look good other than that. 
+
 #plot by year, color by station
 years = seq(1986, 2020, by =1)
 
@@ -618,7 +625,37 @@ ggplot(qaqc_do, aes(x = DATE, y = NTU)) +
 ##### conductivity ####
 ggplot(qaqc_do, aes(x = DATE, y = SPC_USCM)) +
   geom_point()
+#AGAIN, PROBABLY SOME PROMLEMATIC DATA HERE
 
+#### look at 2020 data to see better the relationship between parameters that are suspected in the sediment
+do20 <- qaqc_do %>% 
+  filter(DATE > '2020-01-01') %>% 
+  pivot_longer(cols = c(TEMP:NTU), names_to = 'variable')
+
+ggplot(do20, aes(x = DATE, y = value, color = DEPTH))+
+  geom_point() +
+  facet_grid(variable ~ ., scales = 'free_y') +
+  theme_bw()
+
+#looks like where turbidity is above 100, the sensor is in the sediment.
+qaqc_do <- qaqc_do %>% 
+  mutate_at(vars(TEMP:NTU, conc_H_molpl),
+            ~case_when(NTU>100 ~ NA_real_,
+                       TRUE ~ .))
+#look again
+do20 <- qaqc_do %>% 
+  filter(DATE > '2020-01-01') %>% 
+  pivot_longer(cols = c(TEMP:NTU), names_to = 'variable')
+
+ggplot(do20, aes(x = DATE, y = value, color = DEPTH))+
+  geom_point() +
+  facet_grid(variable ~ ., scales = 'free_y') +
+  theme_bw()
+
+# flagging anything greater than 10 NTU as suspect data
+qaqc_do <- qaqc_do %>% 
+  mutate(gen_flag = case_when(NTU>10 ~ 'sonde suspected in sediment',
+                              TRUE ~ ''))
 
 #### rename columns ####
 qaqc_do <- qaqc_do %>% 
@@ -636,7 +673,7 @@ str(qaqc_do)
 
 #### create vertical dataset ####
 qaqc_do_vert <- qaqc_do %>% 
-  gather(parameter, value, -station, -depth_m, -date, -do_flag, - org_id) %>% 
+  gather(parameter, value, -station, -depth_m, -date, -do_flag,-gen_flag, - org_id) %>% 
   filter(!is.na(value)) %>% 
   mutate(site_type = 'lake',
          depth_m = round(depth_m, digits = 1)) %>% 
@@ -706,7 +743,7 @@ do_turb %>%
   ggplot(., aes(x = date, y = DO_mgl,color = station)) +
   geom_point(aes(size = turb_NTU)) +
   scale_size(breaks = c(0, 10, 30, 50, 100, 310)) 
-ggsave(paste0(figuredump, 'do and turbidity whole record.png'), height = 6, width = 10)
+# ggsave(paste0(figuredump, 'do and turbidity whole record.png'), height = 6, width = 10)
 
 do_turb %>% 
   filter(date >= as.Date('2020-01-01')) %>% 
@@ -714,25 +751,25 @@ do_turb %>%
   ggplot(., aes(x = date, y = DO_mgl,color = station, size = turb_NTU)) +
   geom_point() +
   scale_size(breaks = c(0, 10, 30, 50, 100, 310)) 
-ggsave(paste0(figuredump, 'do and turbidity 2020.png'), height = 6, width = 10)
+# ggsave(paste0(figuredump, 'do and turbidity 2020.png'), height = 6, width = 10)
 
 years_doturb = seq(2001, 2020, by = 1)
 
-pdf(file=paste0(figuredump, 'annual do and turbidity by year.pdf'),width=11,height=8.5)
-par()
-for(i in 1:length(years_doturb)) {
-  PLOT <- do_turb %>% 
-    filter(as.numeric(station) >= 200) %>% 
-    filter(date >= as.Date(paste(years_doturb[i], '01', '01', sep='-')) &
-             date < as.Date(paste(years_doturb[i]+1, '01', '01', sep='-'))) %>% 
-    ggplot(., aes(x = date, y = DO_mgl, size = turb_NTU)) +
-    geom_point()+
-    facet_grid(station ~ .) +
-    theme(legend.position = 'bottom') +
-    labs(title = years_doturb[i])
-  print(PLOT)
-}
-dev.off()
+# pdf(file=paste0(figuredump, 'annual do and turbidity by year.pdf'),width=11,height=8.5)
+# par()
+# for(i in 1:length(years_doturb)) {
+#   PLOT <- do_turb %>% 
+#     filter(as.numeric(station) >= 200) %>% 
+#     filter(date >= as.Date(paste(years_doturb[i], '01', '01', sep='-')) &
+#              date < as.Date(paste(years_doturb[i]+1, '01', '01', sep='-'))) %>% 
+#     ggplot(., aes(x = date, y = DO_mgl, size = turb_NTU)) +
+#     geom_point()+
+#     facet_grid(station ~ .) +
+#     theme(legend.position = 'bottom') +
+#     labs(title = years_doturb[i])
+#   print(PLOT)
+# }
+# dev.off()
 
 do_turb %>% 
   filter(as.numeric(station) >= 200) %>% 
@@ -741,19 +778,28 @@ do_turb %>%
 
 #### plot the data together ####
 lakevars = unique(master_file_lake$parameter)
-pdf(file=paste0(figuredump, 'sunapee whole record by parameter.pdf'),width=11,height=8.5)
-par()
-for(i in 1:length(lakevars)) {
-  DF <- master_file_lake %>% 
-    filter(parameter == lakevars[i])
-  PLOT <- ggplot(DF, aes(x = date, y = value, color = station, shape = flag)) +
-    geom_point() +
-    facet_grid(parameter ~ ., scales = 'free_y') +
-    theme(legend.position = 'bottom')
-  print(PLOT)
-}
-dev.off()
+# pdf(file=paste0(figuredump, 'sunapee whole record by parameter.pdf'),width=11,height=8.5)
+# par()
+# for(i in 1:length(lakevars)) {
+#   DF <- master_file_lake %>% 
+#     filter(parameter == lakevars[i])
+#   PLOT <- ggplot(DF, aes(x = date, y = value, color = station, shape = flag)) +
+#     geom_point() +
+#     facet_grid(parameter ~ ., scales = 'free_y') +
+#     theme(legend.position = 'bottom')
+#   print(PLOT)
+# }
+# dev.off()
 
+# SAVE MASTER FILE ####
+master_file_vert <- master_file_vert %>% 
+  mutate(gen_flag = case_when(is.na(gen_flag) ~ '',
+                              TRUE ~ gen_flag),
+         layer = case_when(is.na(layer) ~ '', 
+                           TRUE ~ layer)) %>% 
+  select(station, date, depth_m, layer, site_type, parameter, value, flag, gen_flag, org_sampid, org_id)
+
+write_csv(master_file_vert, paste0(dumpdir, 'LSPALMP_1986-2020_v', Sys.Date(), '.csv'))
 
 # COLLATE STATION LOCATIONS AND CREATE PARAMETER SUMMARIES ####
 
