@@ -18,7 +18,7 @@ This repository is maintained by B. Steele of the Cary Institute of Ecosystem St
 
 # Lake Sunapee Watershed and Sampling sites
 
-Below is a map of Lake Sunapee, the lake's watershed, and the sampling sites referenced in these data:
+Below is a map of Lake Sunapee, the lake's watershed (shaded green), and the sampling sites referenced in these data. Other waterbodies within the watershed are identified, as well. 
 
 ![Lake Sunapee Watershed and Sampling sites](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/LMP%20sampling%20map%20v2.jpg)
 
