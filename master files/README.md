@@ -8,7 +8,7 @@ This folder contains summary data tables, station location details, and collated
 
 ## [LSPALMP_1986-2020_v2021-03-29.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/LSPALMP_1986-2020_v2021-03-29.csv)
 
-This is the collated file of all LSPA LMP data as collated and QAQC'd in the code found in the 'collation code' folder from 2986-2020. These data have been collated, QAQC'd to recode obviously errant data, and to flag suspicious data.
+This is the collated file of all LSPA LMP data as collated and QAQC'd in the code found in the [collation code](http://github.com/Lake-Sunapee-Protective-Assocaition/LMP/blob/main/collation%20code/) folder from 1986-2020. These data have been collated, QAQC'd to recode obviously errant data, and to flag suspicious data.
 
 | 	Column Name		|	Column Description															|	Units	|	Format 	|
 | 	----			|	----																		|	----	|	----	|
