@@ -56,7 +56,7 @@ This file contains all station location information available from the LSPA. Not
 |	lat_dd			|	latitude of station															| decimal degrees | numeric, WGS84 |
 |	lon_dd			|	longitude of station														| decimal degrees |	numeric, WGS84 |	
 
-Status of 'temporary' is for station(s) that we do not anticipate continued sampling at. These stations will move to 'inactive' once sampling has been completed. 
+Status of 'temporary' is for station(s) at which we do not anticipate continued sampling. These stations will move to 'inactive' once sampling has been completed. 
 
 
 #### [parameter_by_site_sample_summary.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/parameter_by_site_sample_summary.csv)
