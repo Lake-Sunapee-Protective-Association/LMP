@@ -1,6 +1,6 @@
 # Lake Sunapee Protective Association's Longterm Monitoring Program data repository
 
-This repository contains the [Lake Sunapee Protective Association (LSPA)](https://www.lakesunapee.org/) Longterm Monitoring Program (LMP) [historical raw data](https://github.com/Lake-Sunapee-Protective-Association/LMP/tree/main/raw%20data%20files), [collation and QAQC scripts](https://github.com/Lake-Sunapee-Protective-Association/LMP/tree/main/collation%20code), as well as the harmonized post-QAQC [master files](https://github.com/Lake-Sunapee-Protective-Association/LMP/tree/main/master%20files) for all data collected by the LSPA in the watershed 1986-2020. The raw data were made available by the LSPA (lspa@lakesunapee.org) and are archived by the New Hampshire Volunteer Lake Assessment Program (NH VLAP). The foci of this repository are the collation of and the QAQC of the raw LMP data. QAQC in this context only includes the recoding of obviously errant data to *NA* and the addition of use flags to the dataset. The resulting 'master files' are meant for use by researchers who collaborate in the Lake Sunapee Watershed.
+This repository contains the [Lake Sunapee Protective Association (LSPA)](https://www.lakesunapee.org/) Longterm Monitoring Program (LMP) [historical raw data](https://github.com/Lake-Sunapee-Protective-Association/LMP/tree/main/raw%20data%20files), [collation and QAQC scripts](https://github.com/Lake-Sunapee-Protective-Association/LMP/tree/main/collation%20code), as well as the harmonized post-QAQC [master files](https://github.com/Lake-Sunapee-Protective-Association/LMP/tree/main/master%20files) for all data collected by the LSPA in the watershed 1986-2020 as reported in the LMP files. The raw data were made available by the LSPA (lspa@lakesunapee.org) and are archived by the New Hampshire Volunteer Lake Assessment Program (NH VLAP). The foci of this repository are the collation of and the QAQC of the raw LMP data. QAQC in this context only includes the recoding of obviously errant data to *NA* and the addition of use flags to the dataset. The resulting 'master files' are meant for use by researchers who collaborate in the Lake Sunapee Watershed.
 
 These data use the ODC Open Database License v1.0, see *[ODC license.txt](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/odc%20license.txt)* for details on use and reuse. 
 
@@ -8,11 +8,11 @@ Please cite these data using the Zenodo DOI associated with this repository.
 
 #### Contacts: 
 
-code and repository questions: steeleb@caryinstitute.org, weathersk@caryinstitute.org
+code and repository questions: B. Steele - steeleb@caryinstitute.org, Kathleen Weathers -weathersk@caryinstitute.org
 
-data and sampling methodology questions: lspa@lakesunapee.org
+data and sampling methodology questions: Lake Suanpee Protective Association - lspa@lakesunapee.org
 
-This repository is maintained by B. Steele of the Cary Institute of Ecosystem Studies (steeleb@caryinstitute.org). 
+This repository is maintained by B. Steele, Weathers Lab, Cary Institute of Ecosystem Studies (steeleb@caryinstitute.org). 
 
 ***
 
