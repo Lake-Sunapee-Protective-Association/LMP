@@ -5,6 +5,7 @@ This repository contains the [Lake Sunapee Protective Association (LSPA)](https:
 These data use the ODC Open Database License v1.0, see *[ODC license.txt](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/odc%20license.txt)* for details on use and reuse. 
 
 Please cite these data using the Zenodo DOI associated with this repository.
+[![DOI](https://zenodo.org/badge/345705980.svg)](https://zenodo.org/badge/latestdoi/345705980)
 
 #### Contacts: 
 
