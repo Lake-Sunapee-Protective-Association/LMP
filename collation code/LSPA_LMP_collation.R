@@ -380,7 +380,7 @@ ggplot(qaqc_bio, aes(x = date, y = chla_ugl)) +
 #no anomolous points
 qaqc_bio$flag_chla <- ''
 qaqc_bio$flag_chla [qaqc_bio$chla_ugl<1] = 'likely BDL'
-qaqc_bio$flag_chla [qaqc_bio$chla_ugl==0] = 'suspect value'
+qaqc_bio$flag_chla [qaqc_bio$chla_ugl==0] = 'suspect'
 
 
 # plot chl-a with flags
@@ -410,13 +410,13 @@ ggplot(qaqc_bio, aes(x = date, y = secchidepth_m)) +
 
 #flag secchi of 0 and other repeated values
 qaqc_bio$flag_secchi <- ''
-qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==0] = 'suspect value'
-qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==2 & qaqc_bio$station == 80] = 'suspect value'
-qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==4 & (qaqc_bio$station == 20 | qaqc_bio$station == 60) ] = 'suspect value - possible bottom hit'
-qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==4.3 & qaqc_bio$station == 20] = 'suspect value - possible bottom hit'
+qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==0] = 'suspect'
+qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==2 & qaqc_bio$station == 80] = 'suspect - possible bottom hit'
+qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==4 & (qaqc_bio$station == 20 | qaqc_bio$station == 60) ] = 'suspect - possible bottom hit'
+qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==4.3 & qaqc_bio$station == 20] = 'suspect - possible bottom hit'
 
 #and by station
-ggplot(qaqc_bio, aes(x=date, y=secchidepth_m)) +
+ggplot(qaqc_bio, aes(x=date, y=secchidepth_m, color = flag_secchi)) +
   geom_point() +
   facet_grid(.~station) +
   theme_bw()
@@ -473,9 +473,23 @@ ggplot(qaqc_bio_deep, aes(x=date, y=value, color = flag)) +
   facet_grid(parameter~station) +
   theme_bw()
 
+#add flag for hight 210 chl-a (May 2022)
+qaqc_bio_vert <- qaqc_bio_vert %>% 
+  mutate(flag = case_when(parameter == 'chla_ugl' & station == '210' & value > 10 ~ 'suspect',
+                          TRUE ~ flag))
 
+# filter for deep spots
+qaqc_bio_deep <- qaqc_bio_vert %>% 
+  filter(station == 200 | station == 210 | station == 220 | station == 230)
+
+#plot historical deep spot records
+ggplot(qaqc_bio_deep, aes(x=date, y=value, color = flag)) +
+  geom_point() +
+  facet_grid(parameter~station) +
+  theme_bw()
 
 # DO data ####
+
 #NOTE, IN 2021 DATA STORAGE CHANGES - BOTH BIO AND DO, AS WELL AS SOME OTHER PARAMS ARE STORED IN ONE FILE
 
 # load files
@@ -526,7 +540,7 @@ weather_obs <- unique(weather_obs) %>%
   arrange(date) %>% 
   mutate(source = 'DO/Temperature record')
 
-write_csv(weather_obs, paste0(dumpdir, 'weather_observations.csv'))
+# write_csv(weather_obs, paste0(dumpdir, 'weather_observations.csv'))
   
 
 #### pull out bottom z ####
@@ -535,7 +549,7 @@ bottom_depth <- raw_do %>%
   rename(date = DATE,
          station = STATION,
          bottom_depth_m = BOTTOMZ) %>% 
-  mutate(bottom_depth_m = case_when(as.numeric(bottom_depth_m) <= 2.5 ~ NA_real_,
+  mutate(bottom_depth_m = case_when(as.numeric(bottom_depth_m) <= 2.5 ~ NA_real_, #0 and negative are often listed; 2.5 is listed at a deep site, which is incorrect
                                     TRUE ~ as.numeric(bottom_depth_m))) %>% 
   filter(!is.na(bottom_depth_m))
 
@@ -609,6 +623,38 @@ for(i in 1:length(years)){
 }
 dev.off()
 
+
+# flags added May2022
+qaqc_do <- qaqc_do %>% 
+  mutate(year = format(DATE, '%Y')) %>% 
+  mutate(do_flag = case_when(year == 1991 & DO < 2.5 ~ 'suspect',
+                             DATE > as.Date('1992-01-01') & DATE < as.Date('1992-06-01') & DO <7.5 ~ 'suspect',
+                             DATE > as.Date('1994-08-01') & DATE < as.Date('1994-09-01') & DO <2.5 ~ 'suspect',
+                             DATE > as.Date('1995-01-01') & DATE < as.Date('1995-06-02') & DO <5 ~ 'suspect',
+                             DATE > as.Date('1995-07-01') & DATE < as.Date('1995-08-01') & DO <5 ~ 'suspect',
+                             DATE > as.Date('1996-06-01') & DATE < as.Date('1996-07-01') & DO <5 ~ 'suspect',
+                             DATE > as.Date('1997-07-01') & DATE < as.Date('1997-08-01') & DO <2.5 ~ 'suspect',
+                             DATE > as.Date('1998-06-01') & DATE < as.Date('1998-08-01') & DO <5 ~ 'suspect',
+                             DATE > as.Date('1999-01-01') & DATE < as.Date('1999-06-01') & DO <5 ~ 'suspect',
+                             DATE > as.Date('2001-01-01') & DATE < as.Date('2001-06-01') & DO >12.5 ~ 'suspect',
+                             DATE > as.Date('2003-01-01') & DATE < as.Date('2003-06-01') & DO >7.5 ~ 'suspect',
+                             TRUE ~ ''))
+         
+#Set up pdf device and overwrite previous file
+pdf(file=paste0(figuredump, 'sunapee annual do.pdf'),width=11,height=8.5)
+par()
+for(i in 1:length(years)){
+  DF <- qaqc_do %>% 
+    filter(DATE >= paste(years[i], '01', '01', sep='-') &
+             DATE < paste(years[i]+1, '01', '01', sep='-'))
+  PLOT <- ggplot(DF, aes(x = DATE, y = DO, color = do_flag, shape = STATION)) +
+    geom_point() +
+    labs(title = years[i]) +
+    coord_cartesian(ylim = c(0,max(qaqc_do$DO, na.rm = T)))
+  print(PLOT)
+}
+dev.off()
+
 ##### percent saturation ####
 ggplot(qaqc_do, aes(x = DATE, y = PCNTSAT)) +
   geom_point()
@@ -621,13 +667,53 @@ ggplot(qaqc_do, aes(x = DATE, y = PCNTSAT)) +
 
 # add flag to site 210 data on 1994-07-29 seems too high
 qaqc_do <- qaqc_do %>% 
-  mutate(do_flag = NA_character_,
-         do_flag = case_when(DATE == as.Date('1994-07-29') ~ 'possible do calibration issue on this date, do sat very high at 210',
-                             DATE == as.Date('2008-07-01') ~ 'possible do calibration issue on this date, do sat very high at 210',
-                             TRUE ~ '')) 
+  mutate(do_flag = case_when(DATE == as.Date('1994-07-29') & do_flag == '' ~'likely do calibration issue on this date - do sat very high',
+                             DATE == as.Date('2008-07-01') & do_flag == '' ~ 'possible do calibration issue on this date - do sat very high at 210',
+                             DATE == as.Date('1994-07-29') & do_flag != '' ~  paste(do_flag, 'likely do calibration issue on this date - do sat very high', sep = '; '),
+                             DATE == as.Date('2008-07-01') & do_flag != '' ~  paste(do_flag, 'possible do calibration issue on this date - do sat very high at 210', sep = '; '),
+                             TRUE ~ do_flag)) 
 ggplot(qaqc_do, aes(x = DATE, y = PCNTSAT, color = do_flag)) +
   geom_point()
 
+#print year-by-year pdf
+pdf(file=paste0(figuredump, 'sunapee annual dopct.pdf'),width=11,height=8.5)
+par()
+for(i in 1:length(years)){
+  DF <- qaqc_do %>% 
+    filter(DATE >= paste(years[i], '01', '01', sep='-') &
+             DATE < paste(years[i]+1, '01', '01', sep='-'))
+  PLOT <- ggplot(DF, aes(x = DATE, y = PCNTSAT, color = do_flag, shape = STATION)) +
+    geom_point() +
+    labs(title = years[i]) +
+    coord_cartesian(ylim = c(0,max(qaqc_do$PCNTSAT, na.rm = T)))
+  print(PLOT)
+}
+dev.off()
+
+#additional data flags and recoding May 2022
+qaqc_do <- qaqc_do %>% 
+  mutate(do_flag = case_when(DATE > as.Date('1998-07-01') & DATE < as.Date('1998-07-15') & PCNTSAT <25 ~'suspect',
+                             year == 2003 & PCNTSAT > 150 ~ 'suspect',
+                             year == 2007 & PCNTSAT > 150 ~ 'suspect',
+                             TRUE ~ do_flag))  %>% 
+  mutate(PCNTSAT = case_when(DATE >= as.Date('1998-09-01') & DATE < as.Date('1998-10-01') & PCNTSAT < 5 ~ NA_real_, # these should not be zero
+                             DATE == as.Date('1999-07-01') & PCNTSAT < 5 ~ NA_real_, # these should not be zero
+                             TRUE ~ PCNTSAT))
+
+#overwrite year-by-year pdf
+pdf(file=paste0(figuredump, 'sunapee annual dopct.pdf'),width=11,height=8.5)
+par()
+for(i in 1:length(years)){
+  DF <- qaqc_do %>% 
+    filter(DATE >= paste(years[i], '01', '01', sep='-') &
+             DATE < paste(years[i]+1, '01', '01', sep='-'))
+  PLOT <- ggplot(DF, aes(x = DATE, y = PCNTSAT, color = do_flag, shape = STATION)) +
+    geom_point() +
+    labs(title = years[i]) +
+    coord_cartesian(ylim = c(0,max(qaqc_do$PCNTSAT, na.rm = T)))
+  print(PLOT)
+}
+dev.off()
 
 ##### temperature ####
 ggplot(qaqc_do, aes(x = DATE, y = TEMP)) +
@@ -652,6 +738,7 @@ ggplot(qaqc_do, aes(x = DATE, y = TEMP)) +
 ##### pH ####
 ggplot(qaqc_do, aes(x = DATE, y = PH)) +
   geom_point()
+
 # calculate H+ ion from pH (H+ = 10^-pH) and drop pH column
 qaqc_do$conc_H_molpl=10^(qaqc_do$PH * -1)
 qaqc_do$PH = NULL
@@ -728,6 +815,49 @@ ggplot(qaqc_do_vert, aes(x = date, y = value, color = flag)) +
   geom_point() +
   facet_grid(parameter ~ station, scales = 'free_y') +
   theme_bw()
+
+# NEW DO/BIO FORMAT ####
+dobio_2021 <- read_xlsx(paste0(datadir, "2021/LMPDO_2021.xlsx"), 
+                                        sheet="LMPDO",
+                                        col_types = 'text') %>% 
+  mutate(DATE = as.Date(as.numeric(DATE), origin = '1899-12-30')) 
+
+dobiovars = c('DEPTH', 'TEMP', 'DO', 'PCNTSAT', 'SPC-uS/cm', 'pH', 'NTU', 'Chl ug/L', 'Chl RFU')
+
+# format bio columns to numeric
+dobio_2021 <- dobio_2021 %>% 
+  mutate_at(vars(all_of(dobiovars)),
+            ~ as.numeric(.))
+
+# remove unneeded variables and rename others
+dobio_2021 <- dobio_2021 %>% 
+  select(-"LAKE", -"TOWN",- 'Date_Sta_Dp') %>% 
+  rename(date = DATE,
+         depth_m = DEPTH,
+         station = STATION,
+         chla_ugl_sonde = `Chl ug/L`,
+         chla_rfu_sonde = `Chl RFU`,
+         temp_C = TEMP,
+         DO_mgl = DO,
+         DO_pctsat = PCNTSAT,
+         turb_NTU = NTU,
+         cond_uScm = `SPC-uS/cm`,
+         pH = pH,
+         org_id = ID) %>% 
+  mutate(site_type = case_when(station <=230 ~ 'lake',
+                               station >230 ~ 'stream'))
+head(dobio_2021)
+  
+## baseline clean ####
+range(dobio_2021$depth_m)
+range(dobio_2021$temp_C)
+range(dobio_2021$DO_mgl) #0 likely wrong, will look in context
+range(dobio_2021$DO_pctsat) #0 likely wrong, will look in context
+range(dobio_2021$cond_uScm)
+range(dobio_2021$chla_ugl_sonde, na.rm = T) #negative values need to be recoded
+range(dobio_2021$chla_rfu_sonde, na.rm = T) # negative values need to be recoded
+
+
 
 # JOIN AND HARMONIZE ALL DATA ####
 head(qaqc_chem_vert)
