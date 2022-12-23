@@ -5,8 +5,8 @@
 #*                                                               *
 #* TITLE:   LSPA_LMP_collation.R                                 *
 #* AUTHOR:  Bethel Steele steeleb@caryinstitute.org              *
-#* RStudio version: 1.4.1717                                     *
-#* R version: 4.1.0                                              *
+#* RStudio version: 2022.07.01                                   *
+#* R version: 4.2.1                                              *
 #* PURPOSE: Collate long term records of monitoring data         *
 #*          collected in Lake Sunapee                            *
 #* LAST UPDATE: v10May2022 - update through 2021 and add some    *
@@ -17,11 +17,12 @@
 #*          with data through 2019                               *
 #*          no version change 25Sept2020: updated bio and do     *
 #*          sections                                             *  
+#*              v22Dec2022 - update data through 2022            *
 #*****************************************************************
 
 # point to data directories
 datadir = 'raw data files/'
-dumpdir = 'master files/'
+dumpdir = 'primary files/'
 figuredump = 'collation code/tempfigs/'
 
 library(tidyverse) #v1.3.0
@@ -50,7 +51,7 @@ raw_chem_2019 <- read_csv(paste0(datadir,'2019/Sunapee2019Chem.csv'),
 raw_chem_2020 <- read_csv(paste0(datadir,'2020/Sunapee2020CHEM.csv'),
                           col_types = cols(.default = col_character()))%>% 
   mutate(DATE = as.Date(DATE, format = '%d-%b-%y'))
-raw_chem_2021 <- read_xlsx(paste0(datadir,'2021/LMPCHEM_2021.xlsx'),
+raw_chem_2021 <- read_xlsx(paste0(datadir,'2021-2022/LMPCHEM_2021_2022.xlsx'),
                           col_types = 'text') %>% 
   mutate(DATE = as.Date(as.numeric(DATE), origin = '1899-12-30'))
 
@@ -63,7 +64,7 @@ raw_chem <- full_join(raw_chem_2017, raw_chem_2018) %>%
   full_join(., raw_chem_2021)
 colnames(raw_chem)
 
-chem_vars = c("STATION","Depth","PH","H_ION","ALK","TP","COND","TURBIDITY","Chloride")
+chem_vars = c("Depth","PH","H_ION","COLOR", "ALK","TP","COND","TURBIDITY","Chloride")
 
 #format chem columns to numeric
 raw_chem <- raw_chem %>%
