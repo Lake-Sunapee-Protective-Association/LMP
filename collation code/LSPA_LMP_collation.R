@@ -61,20 +61,26 @@ raw_chem_2021 <- read_xlsx(paste0(datadir,'2021-2022/LMPCHEM_2021_2022.xlsx'),
 raw_chem <- full_join(raw_chem_2017, raw_chem_2018) %>% 
   full_join(., raw_chem_2019) %>% 
   full_join(., raw_chem_2020) %>% 
-  full_join(., raw_chem_2021)
+  full_join(., raw_chem_2021) %>% 
+  arrange(DATE)
 colnames(raw_chem)
 
 chem_vars = c("Depth","PH","H_ION","COLOR", "ALK","TP","COND","TURBIDITY","Chloride")
 
 #format chem columns to numeric
 raw_chem <- raw_chem %>%
-  mutate_at(vars(all_of(chem_vars)),
+  mutate_at(vars(all_of(chem_vars), STATION),
             ~ as.numeric(.))
+
+# pull out sunapee from other data without station ids
+unique(raw_chem$LAKE)
+unique(raw_chem$STATION)
 
 # remove unneeded variables and rename others
 raw_chem <- raw_chem %>% 
-  select(-"LAKE", -"TOWN", -"YEAR", -"MONTH", -"COLOR",-'H_ION', -'Date_Sta_Lr',-'CompleteDate') %>% #no data in COLOR or H_ION variable
+  select(-"TOWN", -"YEAR", -"MONTH", -'H_ION', -'StationText', -'Date_Sta_Lr',-'CompleteDate') %>% #no data in H_ION variable
   rename(date = DATE,
+         lake = LAKE,
          station =STATION,
          depth_m = Depth,
          layer = LAYER, 
@@ -84,11 +90,18 @@ raw_chem <- raw_chem %>%
          cond_uScm = COND, 
          turb_NTU = TURBIDITY,
          cl_mgl = Chloride,
+         color_PCU = COLOR,
          org_id = ID,
          org_sampid = 'SampleID') %>% 
+  mutate(lake = toupper(lake),
+         station = case_when(station < 0 ~ NA_real_,
+                             TRUE ~ station)) %>% 
   mutate(site_type = case_when(station <=230 ~ 'lake',
-                              station >230 ~ 'stream'))
+                              station >230 ~ 'stream',
+                              is.na(station) ~ 'new site',
+                              TRUE ~ ''))
 str(raw_chem)
+
 
 ### baseline chem data clean up ####
 # start with a new dataframe
@@ -96,21 +109,25 @@ qaqc_chem <- raw_chem
 
 # look at layer info:
 unique(qaqc_chem$layer)
-qaqc_chem$layer [qaqc_chem$layer=="0"] = "O"
-qaqc_chem$layer [qaqc_chem$layer=="1"] = "I" #presumed transcription error
-qaqc_chem$layer [qaqc_chem$layer=="L"] = "I" #presumed transcription error
+qaqc_chem$layer [qaqc_chem$layer=="0"] = "O" #outlet
+qaqc_chem$layer [qaqc_chem$layer=="1"] = "I" #presumed transcription error this is a shallow location
+qaqc_chem$layer [qaqc_chem$layer=="L"] = "I" #presumed transcription error all others are integrated
 qaqc_chem$layer [qaqc_chem$layer=="N"] = "" #this is the layer for many of the early records, recoding to blank
 qaqc_chem$layer [qaqc_chem$layer=="5"] = "" #this is in a stream
+unique(qaqc_chem$layer)
 
-# all stations < 100 are I
-qaqc_chem$layer [qaqc_chem$station <100 & qaqc_chem$layer == ''] = 'I'
+# all stations < 110 are I
+qaqc_chem$layer [qaqc_chem$station <110 & !is.na(qaqc_chem$station) & qaqc_chem$layer == ''] = 'I'
 
 #recode depth and layer for stream samples
 qaqc_chem$depth_m [qaqc_chem$site_type=="stream"] = NA_real_
 qaqc_chem$layer [qaqc_chem$site_type=="stream"] = ""
 
+unique(qaqc_chem$layer)
+unique(qaqc_chem$depth_m)
 
 ### look at ranges and recode data that are obviously NA or errant ####
+colnames(qaqc_chem)
 
 # set missing data to NA
 range(qaqc_chem$pH, na.rm = T)
@@ -123,6 +140,10 @@ range(qaqc_chem$alk_mglCaCO3, na.rm = T)
 qaqc_chem$alk_mglCaCO3 [qaqc_chem$alk_mglCaCO3<=-99] = NA
 qaqc_chem$alk_mglCaCO3 [qaqc_chem$alk_mglCaCO3==99] = NA
 range(qaqc_chem$alk_mglCaCO3, na.rm = T)
+
+range(qaqc_chem$color_PCU, na.rm = T)
+qaqc_chem$color_PCU [qaqc_chem$color_PCU<=0] = NA
+range(qaqc_chem$color_PCU, na.rm = T)
 
 range(qaqc_chem$TP_mgl, na.rm = T)
 qaqc_chem$TP_mgl [qaqc_chem$TP_mgl<=-99] = NA
@@ -149,10 +170,6 @@ qaqc_chem$turb_NTU [qaqc_chem$turb_NTU==-99] = NA
 range(qaqc_chem$turb_NTU, na.rm = T)
 
 range(qaqc_chem$cl_mgl, na.rm = T)
-#no cl data in 2021, but recorded as 0 - need to recode all to na
-qaqc_chem <- qaqc_chem %>% 
-  mutate(cl_mgl = case_when(date > as.Date('2021-01-01') & date < as.Date('2022-01-01') ~ NA_real_,
-                            TRUE ~ cl_mgl))
 
 ### plot to check for funky values ####
 #### ph ####
@@ -162,12 +179,23 @@ ggplot(qaqc_chem, aes(x = date, y = pH)) +
 
 #recode the data in lake above 10
 qaqc_chem$pH [qaqc_chem$pH>10] = NA
-qaqc_chem$ph_flag [qaqc_chem$pH<5.1 & qaqc_chem$site_type == 'lake'] = 'suspect'
+qaqc_chem$pH_flag = ''
+qaqc_chem$pH_flag [qaqc_chem$pH<5.5 & qaqc_chem$site_type == 'lake'] = 'low pH suspect'
 
 #replot
-ggplot(qaqc_chem, aes(x = date, y = pH, color = ph_flag)) +
+ggplot(qaqc_chem, aes(x = date, y = pH, color = pH_flag)) +
   facet_grid(site_type~. ) +
   geom_point(aes(shape = layer))
+
+ggplot(qaqc_chem, aes(x = as.numeric(format(date, '%j')), y = pH, color = pH_flag)) +
+  geom_point() +  
+  facet_grid(site_type~. )
+
+qaqc_chem$pH_flag [qaqc_chem$pH>7.5 & qaqc_chem$site_type == 'stream' & as.numeric(format(qaqc_chem$date, '%j'))>275] = 'high pH suspect'
+
+ggplot(qaqc_chem, aes(x = as.numeric(format(date, '%j')), y = pH, color = pH_flag)) +
+  geom_point() +  
+  facet_grid(site_type~. )
 
 # calculate H+ ion from pH (H+ = 10^-pH) and drop pH column
 qaqc_chem$conc_H_molpl=10^(qaqc_chem$pH * -1)
@@ -182,9 +210,10 @@ ggplot(qaqc_chem, aes(x = date, y = alk_mglCaCO3, color = depth_m)) +
 #flag 0 values as well as in-lake values >9
 qaqc_chem <- qaqc_chem %>% 
   mutate(year = format(date, '%Y')) %>% 
-  mutate(alk_flag = case_when(alk_mglCaCO3 == 0 ~ 'suspect',
-                              alk_mglCaCO3 > 9 & site_type == 'lake' ~ 'suspect',
-                              (year == 1995 | year == 2000) & alk_mglCaCO3 <2 & site_type == 'lake' ~ 'suspect',
+  mutate(alk_flag = case_when(alk_mglCaCO3 == 0 ~ 'low alk suspect',
+                              alk_mglCaCO3 > 9 & site_type == 'lake' ~ 'high alk suspect',
+                              (year == 1995 | year == 1993 |  year == 1998 | year == 2000) & alk_mglCaCO3 <2.5 & site_type == 'lake' ~ 'low alk suspect',
+                              year == 1993 & site_type == 'stream' & alk_mglCaCO3 < 1.5 ~ 'low alk suspect',
                               TRUE ~ ''))
 
 ggplot(qaqc_chem, aes(x = date, y = alk_mglCaCO3, color = alk_flag)) +
@@ -196,7 +225,6 @@ ggplot(qaqc_chem, aes(x = date, y = alk_mglCaCO3, color = alk_flag)) +
 ggplot(qaqc_chem, aes(x = date, y = TP_mgl, color = depth_m)) +
   facet_grid(site_type~. , scales = 'free_y') +
   geom_point(aes(shape = layer))
-#looks good; higher TP are at littoral sites or hypo samples
 
 #### cond ####
 ggplot(qaqc_chem, aes(x = date, y = cond_uScm, color = depth_m)) +
@@ -205,20 +233,34 @@ ggplot(qaqc_chem, aes(x = date, y = cond_uScm, color = depth_m)) +
   scale_x_date(minor_breaks = '1 year')
 
 #remove anomolous point above 2500
-qaqc_chem$cond_uScm [qaqc_chem$cond_uScm>2500] = NA
-
-#flag values below 25 in lake
 qaqc_chem <- qaqc_chem %>% 
-  mutate(cond_flag = case_when(cond_uScm < 45 & site_type == 'lake' ~ 'suspect', 
-                               year >= 1993 & cond_uScm < 62& site_type == 'lake' ~ 'suspect',
-                               year  == 2010 & cond_uScm < 80& site_type == 'lake' ~ 'suspect',
-                               year == 2019 & cond_uScm <80& site_type == 'lake' ~ 'suspect',
-                               TRUE ~ ''))
+  mutate(cond_flag = case_when(cond_uScm>2500 ~ 'high cond suspect',
+                                site_type == 'lake' & cond_uScm < 47 ~ 'low cond suspect',
+                               site_type == 'lake' & as.numeric(format(date, '%Y')) == 1997 &
+                                 cond_uScm <65 ~ 'low cond suspect',
+                                TRUE ~ ''))
+
+ggplot(qaqc_chem, aes(x = date, y = cond_uScm, color = cond_flag)) +
+  facet_grid(site_type~., scales = 'free_y') +
+  geom_point(aes(shape = layer)) +
+  scale_x_date(minor_breaks = '1 year')
+
+ggplot(qaqc_chem, aes(x = date, y = cond_uScm, color = cond_flag)) +
+  facet_grid(site_type~.) +
+  scale_y_continuous(limit = c(0, 50)) +
+  geom_point(aes(shape = layer)) +
+  scale_x_date(minor_breaks = '1 year')
+
+#flag low stream values
+qaqc_chem <- qaqc_chem %>% 
+  mutate(cond_flag = case_when(cond_uScm<9 & site_type == 'stream' ~ 'low cond suspect',
+                               TRUE ~ cond_flag))
 
 ggplot(qaqc_chem, aes(x = date, y = cond_uScm, color = cond_flag)) +
   facet_grid(site_type~. , scales = 'free_y') +
   geom_point(aes(shape = layer))+
   scale_x_date(minor_breaks = '1 year')
+
 
 #### turbidity ####
 ggplot(qaqc_chem, aes(x = date, y = turb_NTU, color = depth_m)) +
@@ -227,13 +269,18 @@ ggplot(qaqc_chem, aes(x = date, y = turb_NTU, color = depth_m)) +
 
 #flag in-lake above 30 and stream > 500 
 qaqc_chem <- qaqc_chem %>% 
-  mutate(turb_flag = case_when(turb_NTU >30 & site_type == 'lake' ~ 'suspect unless recent storm', 
+  mutate(turb_flag = case_when(turb_NTU >30 & site_type == 'lake' ~ 'high turb suspect unless recent storm', 
                                turb_NTU >500 & site_type == 'stream' ~ 'suspect unless recent storm', 
-                               turb_NTU >5 & year == 1998 & site_type == 'lake' ~ 'suspect', 
                                TRUE ~ ''))
 
 ggplot(qaqc_chem, aes(x = date, y = turb_NTU, color = turb_flag)) +
   facet_grid(site_type~. , scales = 'free_y') +
+  geom_point(aes(shape = layer))
+
+#zoom in on values near zero
+ggplot(qaqc_chem, aes(x = date, y = turb_NTU, color = turb_flag)) +
+  facet_grid(site_type~.) +
+  scale_y_continuous(limits = c(0, 5))+
   geom_point(aes(shape = layer))
 
 #### chloride ####
@@ -241,32 +288,47 @@ ggplot(qaqc_chem, aes(x = date, y = cl_mgl, color = depth_m)) +
   facet_grid(site_type~. , scales = 'free_y') +
   geom_point(aes(shape = layer))
 
+#### color ####
+ggplot(qaqc_chem, aes(x = date, y = color_PCU)) +
+  facet_grid(site_type~. , scales = 'free_y') +
+  geom_point(aes(shape = layer))
+
+#need to recode values of 99 prior to 2021
+qaqc_chem$color_PCU = ifelse(qaqc_chem$color_PCU == 99 & qaqc_chem$date < as.Date('2021-01-01'), NA_real_, qaqc_chem$color_PCU)
+
+ggplot(qaqc_chem, aes(x = date, y = color_PCU)) +
+  facet_grid(site_type~. , scales = 'free_y') +
+  geom_point(aes(shape = layer))
+
+
 #### look at comments ####
 unique(qaqc_chem$Comments)
 # move the storm event into own column
 qaqc_chem <- qaqc_chem %>% 
   mutate(gen_flag = case_when(Comments == 'STORM EVENT' ~ 'storm event sampling',
-                              TRUE ~ ''))
+                              TRUE ~ '')) %>% 
+  select(-Comments)
 
 ### create vertical dataset, eliminate na rows and export master files ####
-
 #create vertical dataset
 colnames(qaqc_chem)
 qaqc_chem_vert <- qaqc_chem %>% 
-  select(-Comments, - year) %>% 
-  gather(parameter, value, -station, -layer, -depth_m, -date, -ph_flag, -TP_flag, -alk_flag, -cond_flag, -turb_flag, -gen_flag, -org_id, -org_sampid, -site_type) %>% 
+  select(-year) %>% 
+  pivot_longer(names_to = 'parameter', values_to = 'value',
+               cols = c("alk_mglCaCO3", "color_PCU", "TP_mgl", "cond_uScm", "turb_NTU", "cl_mgl", "conc_H_molpl"))
+
+qaqc_chem_vert <- qaqc_chem_vert %>% 
   filter(!is.na(value)) %>% 
-  mutate(flag = NA_character_) %>% 
   mutate(flag = case_when(parameter == 'TP_mgl' & TP_flag != '' ~ TP_flag,
                           parameter == 'alk_mglCaCO3' & alk_flag != '' ~ alk_flag,
                           parameter == 'cond_uScm' & cond_flag != '' ~ cond_flag,
                           parameter == 'turb_NTU' & turb_flag != '' ~ turb_flag,
-                          parameter == 'conc_H_molpl' & ph_flag != '' ~ turb_flag,
-                          TRUE ~ ''),
-         flag = case_when(gen_flag != '' & flag != '' ~ paste(flag, gen_flag, sep = '; '),
+                          parameter == 'conc_H_molpl' & pH_flag != '' ~ pH_flag,
+                          TRUE ~ '')) %>% 
+  mutate(flag = case_when(gen_flag != '' & flag != '' ~ paste(flag, gen_flag, sep = '; '),
                           gen_flag != '' & flag == '' ~ gen_flag,
                           TRUE ~ flag)) %>% 
-  select(-TP_flag,-alk_flag, -cond_flag, -turb_flag, -gen_flag, -ph_flag) 
+  select(-TP_flag,-alk_flag, -cond_flag, -turb_flag, -gen_flag, -pH_flag) 
 
 #plot all data with flags
 ggplot(qaqc_chem_vert, aes(x = date, y = value, color = flag)) +
@@ -279,6 +341,7 @@ stream_chem_vert <- qaqc_chem_vert %>%
   filter(site_type == 'stream') %>% 
   select(-depth_m, -layer)
 unique(stream_chem_vert$station)
+
 ggplot(stream_chem_vert, aes(x = date, y = value, color = flag)) +
   geom_point() +
   facet_grid(parameter~., scales = 'free_y') +
