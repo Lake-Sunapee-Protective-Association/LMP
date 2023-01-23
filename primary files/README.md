@@ -6,13 +6,13 @@ This folder contains summary data tables, station location details, and collated
 
 # Data files
 
-## [LSPALMP_1986-2022_v2023-01-22.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/LSPALMP_1986-2022_v2023-01-22.csv)
+## [LSPALMP_1986-2022_v2023-01-22.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/primary%20files/LSPALMP_1986-2022_v2023-01-22.csv)
 
 This is the collated file of all LSPA LMP data as collated and QAQC'd in the code found in the [collation code](http://github.com/Lake-Sunapee-Protective-Association/LMP/tree/main/collation%20code) folder from 1986-2022. These data have been collated, QAQC'd to recode obviously errant data, and to flag suspicious data.
 
 | 	Column Name		|	Column Description															|	Units	|	Format 	|
 | 	----			|	----																		|	----	|	----	|
-|	station	|	station identifier, see [station_location_details.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/station_location_details.csv) for location lat-longs	|	*N/A*	|	numeric	|
+|	station	|	station identifier, see [station_location_details.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/primary%20files/station_location_details.csv) for location lat-longs	|	*N/A*	|	numeric	|
 |	date	|	date of observation, measurement, or sample	|	*N/A*	|	YYYY-MM-DD	|
 |	depth_m	|	depth of observation, measurement, or sample if applicable	|	meters	|	numeric	|
 |	layer	|	layer from which an observation, measurement, or sample was taken, if applicable	|	I = integrated, E = epilimnion, M = metalimnion, H = hypolimnion	|	character	|
@@ -24,7 +24,7 @@ This is the collated file of all LSPA LMP data as collated and QAQC'd in the cod
 |	org_id	|	where 'ID' was listed in the original raw data file, it was copied to this column	|	*N/A*	|	character	|
 
 
-Additional information for the parameter column:
+Additional information for the parameter column, names use ODM2 variable names and units where applicable:
 | 	Parameter Name	|	Parameter Description							|	Parameter Units	|	instrument	|	location of measurement	|
 | 	----			|	----											|	----	| 	----	|	----	|
 |	alkalinity_mglCaCO3	|	water alkalinity								| 	milligramsPerLiter |	VWR SympHony B10P	|	CSC	|
@@ -43,7 +43,7 @@ Additional information for the parameter column:
 
 Sample analysis methodology questions should be directed to the LSPA. 'CSC' = LSPA lab at Colby Sawyer College
 
-#### [station_location_details.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/station_location_details.csv)
+#### [station_location_details.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/primary%20files/station_location_details.csv)
 
 This file contains all station location information available from the LSPA. Note that not all stations have latitude/longitude information stored with them.
 
@@ -61,7 +61,7 @@ This file contains all station location information available from the LSPA. Not
 Status of 'temporary' is for station(s) at which we do not anticipate continued sampling. These stations will move to 'inactive' once sampling has been completed. 
 
 
-#### [parameter_by_site_sample_summary.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/parameter_by_site_sample_summary.csv)
+#### [parameter_by_site_sample_summary.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/primary%20files/parameter_by_site_sample_summary.csv)
 
 This file contains a brief summary of when/how long each parameter was measured at any given site.
 
@@ -96,7 +96,7 @@ Additional information for the parameter column:
 Sample analysis methodology questions should be directed to the LSPA. 'CSC' = LSPA lab at Colby Sawyer College
 
 
-#### [weather_observations.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/weather_observations.csv)
+#### [weather_observations.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/primary%20files/weather_observations.csv)
 
 This file contains a summary of unique date/station pairs where weather conditions were reported in the LSPA's LMP files. 
 
