@@ -6,9 +6,9 @@ This folder contains summary data tables, station location details, and collated
 
 # Data files
 
-## [LSPALMP_1986-2020_v2021-03-29.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/LSPALMP_1986-2020_v2021-03-29.csv)
+## [LSPALMP_1986-2022_v2023-01-22.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/LSPALMP_1986-2022_v2023-01-22.csv)
 
-This is the collated file of all LSPA LMP data as collated and QAQC'd in the code found in the [collation code](http://github.com/Lake-Sunapee-Protective-Association/LMP/tree/main/collation%20code) folder from 1986-2020. These data have been collated, QAQC'd to recode obviously errant data, and to flag suspicious data.
+This is the collated file of all LSPA LMP data as collated and QAQC'd in the code found in the [collation code](http://github.com/Lake-Sunapee-Protective-Association/LMP/tree/main/collation%20code) folder from 1986-2022. These data have been collated, QAQC'd to recode obviously errant data, and to flag suspicious data.
 
 | 	Column Name		|	Column Description															|	Units	|	Format 	|
 | 	----			|	----																		|	----	|	----	|
@@ -27,17 +27,19 @@ This is the collated file of all LSPA LMP data as collated and QAQC'd in the cod
 Additional information for the parameter column:
 | 	Parameter Name	|	Parameter Description							|	Parameter Units	|	instrument	|	location of measurement	|
 | 	----			|	----											|	----	| 	----	|	----	|
-|	alk_mglCaCO3	|	water alkalinity								| 	milligramsPerLiter |	VWR SympHony B10P	|	CSC	|
-|	chla_ugl		|	concentration of chlorophyll-*a* in water		|	microgramsPerLiter	|	ThermoScientific Genesys 30	|	CSC	|
-|	cl_mgl			|	concentration of chloroide in water				|	milligramsPerLiter	|	Orion VersaStar Pro Meter	|	CSC	|
-|	conc_H_molpL	|	concentration of hydrogen ions in water			|	molesPerLiter	|	VWR SympHony B10P (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
-|	cond_uScm		|	conductivity of water							|	microSiemensPerCentimeter	|	Orion 3Star Meter (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
-|	secchidepth_m	|	Secchi depth									| 	meters	|	Secchi disc	|	*in-situ*	|
-|	TP_mgl			| 	concentration of total phosphorus in water		|	milligramsPerLiter	|	ThermoScientific Genesys 30	|	CSC	|
-|	turb_NTU		|	turbidity of water								|	nephelometricTurbidityUnit	|	 HF Scientific Micro 100 (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
-|	DO_mgl			|	dissolved oxygen concentration in water			| 	milligramsPerLiter	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
-|	DO_pctsat		|	dissolved oxygen saturation in water			| 	percent	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
-|	temp_C			|	temperature of water							|	degreesCelsius	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
+|	alkalinity_mglCaCO3	|	water alkalinity								| 	milligramsPerLiter |	VWR SympHony B10P	|	CSC	|
+|	chlorphyll_a_ugl		|	concentration of chlorophyll-*a* in water		|	microgramsPerLiter	|	ThermoScientific Genesys 30	|	CSC	|
+|	chloride_mgl			|	concentration of chloroide in water				|	milligramsPerLiter	|	Orion VersaStar Pro Meter	|	CSC	|
+|	dissolvedHydrogen_moll	|	concentration of hydrogen ions in water			|	molesPerLiter	|	VWR SympHony B10P (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
+|	specificConductance_uScm		|	conductivity of water							|	microSiemensPerCentimeter	|	Orion 3Star Meter (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
+|	secchiDepth_m	|	Secchi depth									| 	meters	|	Secchi disc	|	*in-situ*	|
+|	totalPhosphorus_mgl			| 	concentration of total phosphorus in water		|	milligramsPerLiter	|	ThermoScientific Genesys 30	|	CSC	|
+|	turbidity_NTU		|	turbidity of water								|	nephelometricTurbidityUnit	|	 HF Scientific Micro 100 (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
+|	oxygenDissolved_mgl			|	dissolved oxygen concentration in water			| 	milligramsPerLiter	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
+|	oxygenDissolvedPercentOfSaturation_pct		|	dissolved oxygen saturation in water			| 	percent	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
+|	waterTemperature_degC			|	temperature of water							|	degreesCelsius	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
+|	chlorophyllFluorescence_ugl			|	chlorophyll estimated from *in situ* fluorescence						|	microGramsPerLiter	|	YSI ProDSS	|	*in-situ*	|
+|	chlorophyllFluorescence_RFU		|	chlorophyll fluroescence 					|	relativeFluorescenceUnits	|	YSI ProDSS	|	*in-situ*	|
 
 Sample analysis methodology questions should be directed to the LSPA. 'CSC' = LSPA lab at Colby Sawyer College
 
@@ -77,17 +79,19 @@ This file contains a brief summary of when/how long each parameter was measured 
 Additional information for the parameter column:
 | 	Parameter Name	|	Parameter Description							|	Parameter Units	|	instrument	|	location of measurement	|
 | 	----			|	----											|	----	| 	----	|	----	|
-|	alk_mglCaCO3	|	water alkalinity								| 	milligramsPerLiter |	VWR SympHony B10P	|	CSC	|
-|	chla_ugl		|	concentration of chlorophyll-*a* in water		|	microgramsPerLiter	|	ThermoScientific Genesys 30	|	CSC	|
-|	cl_mgl			|	concentration of chloroide in water				|	milligramsPerLiter	|	Orion VersaStar Pro Meter	|	CSC	|
-|	conc_H_molpL	|	concentration of hydrogen ions in water			|	molesPerLiter	|	VWR SympHony B10P (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
-|	cond_uScm		|	conductivity of water							|	microSiemensPerCentimeter	|	Orion 3Star Meter (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
-|	secchidepth_m	|	Secchi depth									| 	meters	|	Secchi disc	|	*in-situ*	|
-|	TP_mgl			| 	concentration of total phosphorus in water		|	milligramsPerLiter	|	ThermoScientific Genesys 30	|	CSC	|
-|	turb_NTU		|	turbidity of water								|	nephelometricTurbidityUnit	|	 HF Scientific Micro 100 (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
-|	DO_mgl			|	dissolved oxygen concentration in water			| 	milligramsPerLiter	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
-|	DO_pctsat		|	dissolved oxygen saturation in water			| 	percent	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
-|	temp_C			|	temperature of water							|	degreesCelsius	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
+|	alkalinity_mglCaCO3	|	water alkalinity								| 	milligramsPerLiter |	VWR SympHony B10P	|	CSC	|
+|	chlorophyll_a_ugl		|	concentration of chlorophyll-*a* in water		|	microgramsPerLiter	|	ThermoScientific Genesys 30	|	CSC	|
+|	chloride_mgl			|	concentration of chloroide in water				|	milligramsPerLiter	|	Orion VersaStar Pro Meter	|	CSC	|
+|	dissolvedHydrogen_moll	|	concentration of hydrogen ions in water			|	molesPerLiter	|	VWR SympHony B10P (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
+|	specificConductance_uScm		|	specific conductance of water							|	microSiemensPerCentimeter	|	Orion 3Star Meter (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
+|	secchiDepth_m	|	Secchi depth									| 	meters	|	Secchi disc	|	*in-situ*	|
+|	totalPhosphorus_mgl			| 	concentration of total phosphorus in water		|	milligramsPerLiter	|	ThermoScientific Genesys 30	|	CSC	|
+|	turbidity_NTU		|	turbidity of water								|	nephelometricTurbidityUnit	|	 HF Scientific Micro 100 (pre-2019), then YSI ProDSS	|	CSC, then *in-situ*	|
+|	oxygenDissolved_mgl			|	dissolved oxygen concentration in water			| 	milligramsPerLiter	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
+|	oxygenDissolvedPercentOfSaturation_pct		|	dissolved oxygen saturation in water			| 	percent	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
+|	waterTemperature_degC			|	temperature of water							|	degreesCelsius	|	unkown sonde (pre-2019), then YSI ProDSS	|	*in-situ*	|
+|	chlorophyllFluorescence_ugl			|	chlorophyll estimated from *in situ* fluorescence						|	microGramsPerLiter	|	YSI ProDSS	|	*in-situ*	|
+|	chlorophyllFluorescence_RFU		|	chlorophyll fluroescence 					|	relativeFluorescenceUnits	|	YSI ProDSS	|	*in-situ*	|
 
 Sample analysis methodology questions should be directed to the LSPA. 'CSC' = LSPA lab at Colby Sawyer College
 
