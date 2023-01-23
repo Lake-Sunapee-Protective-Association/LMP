@@ -893,7 +893,7 @@ qaqc_do_vert <- qaqc_do %>%
          depth_m = round(depth_m, digits = 1)) %>% 
   mutate(flag = '') %>% 
   mutate(flag = case_when(parameter == 'oxygenDissolved_mgl' ~ do_flag,
-                          parameter == 'oxygenDissovedPercentOfSaturation_pct' ~ do_flag,
+                          parameter == 'oxygenDissolvedPercentOfSaturation_pct' ~ do_flag,
                           parameter == 'chlorophyllFluorescence_ugl' | parameter == 'chlorophyllFluorescence_RFU' ~ chl_flag,
                           TRUE ~ '')) %>% 
   select(-do_flag, -chl_flag) 
@@ -959,7 +959,7 @@ for(i in 1:length(years_doturb)) {
     filter(as.numeric(station) >= 200) %>%
     filter(date >= as.Date(paste(years_doturb[i], '01', '01', sep='-')) &
              date < as.Date(paste(years_doturb[i]+1, '01', '01', sep='-'))) %>%
-    ggplot(., aes(x = date, y = oxygenDissolvedPercentOfSaturation_pct, size = turbidity_NTU)) +
+    ggplot(., aes(x = date, y = DO_pctsat, size = turb_NTU)) +
     geom_point()+
     facet_grid(station ~ .) +
     theme(legend.position = 'bottom') +
