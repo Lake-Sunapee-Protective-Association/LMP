@@ -249,7 +249,7 @@ qaqc_chem <- qaqc_chem %>%
   mutate(gen_flag = case_when(Comments == 'STORM EVENT' ~ 'storm event sampling',
                               TRUE ~ ''))
 
-### create vertical dataset, eliminate na rows and export master files ####
+### create vertical dataset, eliminate na rows and export primary files ####
 
 #create vertical dataset
 colnames(qaqc_chem)
@@ -605,7 +605,7 @@ ggplot(bottom_depth, aes(x = date, y = bottom_depth_m)) +
   geom_point() +
   facet_grid(station ~ .)
 
-#some of these look okay, but there are inconsistencies - not pushing these to the master file at this time.
+#some of these look okay, but there are inconsistencies - not pushing these to the primary file at this time.
 
 #select pertinent columns
 qaqc_do <- raw_do %>% 
@@ -912,7 +912,7 @@ unique(qaqc_bio_vert$parameter)
 head(qaqc_do_vert)
 unique(qaqc_do_vert$parameter)
 
-master_file_vert <- qaqc_chem_vert %>% 
+primary_file_vert <- qaqc_chem_vert %>% 
   mutate(station = as.numeric(station)) %>% 
   full_join(., qaqc_bio_vert) %>% 
   full_join(., qaqc_do_vert) %>% 
@@ -922,27 +922,27 @@ head(qaqc_chem)
 head(qaqc_bio)
 head(qaqc_do)
 
-unique(master_file_vert$parameter)
-unique(master_file_vert$site_type)
+unique(primary_file_vert$parameter)
+unique(primary_file_vert$site_type)
 
-master_file_stream <- master_file_vert %>% 
+primary_file_stream <- primary_file_vert %>% 
   filter(site_type == 'stream') 
-master_file_lake <- master_file_vert %>% 
+primary_file_lake <- primary_file_vert %>% 
   filter(site_type == 'lake')
 
 #### qaqc with whole dataset ####
 # plot turbidity and do together
-lake_do <- master_file_lake %>% 
+lake_do <- primary_file_lake %>% 
   filter(parameter == 'oxygenDissolved_mgl') %>% 
   rename(DO_mgl = value,
          do_flag = flag) %>% 
   select(-parameter, -layer, - org_id, -org_sampid)
-lake_dosat<- master_file_lake %>% 
+lake_dosat<- primary_file_lake %>% 
   filter(parameter == 'oxygenDissolvedPercentOfSaturation_pct') %>% 
   rename(DO_pctsat = value,
          dosat_flag = flag) %>% 
   select(-parameter, -layer, - org_id, -org_sampid)
-lake_turb<- master_file_lake %>% 
+lake_turb<- primary_file_lake %>% 
   filter(parameter == 'turbidity_NTU') %>% 
   rename(turb_NTU = value,
          turb_flag = flag) %>% 
@@ -969,11 +969,11 @@ for(i in 1:length(years_doturb)) {
 dev.off()
 
 #### plot the data together ####
-lakevars = unique(master_file_lake$parameter)
+lakevars = unique(primary_file_lake$parameter)
 pdf(file=paste0(figuredump, 'sunapee whole record by parameter.pdf'),width=11,height=8.5)
 par()
 for(i in 1:length(lakevars)) {
-  DF <- master_file_lake %>%
+  DF <- primary_file_lake %>%
     filter(parameter == lakevars[i])
   PLOT <- ggplot(DF, aes(x = date, y = value, color = station, shape = flag)) +
     geom_point() +
@@ -983,8 +983,8 @@ for(i in 1:length(lakevars)) {
 }
 dev.off()
 
-# SAVE MASTER FILE ####
-master_file_vert <- master_file_vert %>% 
+# SAVE primary FILE ####
+primary_file_vert <- primary_file_vert %>% 
   mutate(gen_flag = case_when(is.na(gen_flag) ~ '',
                               TRUE ~ gen_flag),
          layer = case_when(is.na(layer) ~ '', 
@@ -992,12 +992,12 @@ master_file_vert <- master_file_vert %>%
   select(station, date, depth_m, layer, site_type, 
          parameter, value, flag, gen_flag, org_sampid, org_id)
 
-write_csv(master_file_vert, paste0(dumpdir, 'LSPALMP_1986-2022_v', Sys.Date(), '.csv'))
+write_csv(primary_file_vert, paste0(dumpdir, 'LSPALMP_1986-2022_v', Sys.Date(), '.csv'))
 
 # COLLATE STATION LOCATIONS AND CREATE PARAMETER SUMMARIES ####
 
-#create master list of stations in the master file
-station <- unique(master_file_vert$station) 
+#create primary list of stations in the primary file
+station <- unique(primary_file_vert$station) 
 station <- tibble(station)
 
 #add stream/lake identifier as well as site type and sub type for lake sites
@@ -1009,8 +1009,8 @@ station_details <- station %>%
                                    site_type == 'lake' & station <200 ~ 'cove',
                                    TRUE ~ '')) 
 
-# make a summary of first sample, last sample per parameter per site, export as summary file in master files
-parameter_summary <- master_file_vert %>% 
+# make a summary of first sample, last sample per parameter per site, export as summary file in primary files
+parameter_summary <- primary_file_vert %>% 
   group_by(station, parameter) %>% 
   summarize(first_sample = min(date),
             last_sample = max(date),
@@ -1022,7 +1022,7 @@ write_csv(parameter_summary, paste0(dumpdir, 'parameter_by_site_sample_summary.c
 
 
 # summarize year of first and last sample by station to summarize station status
-station_summary <- master_file_vert %>% 
+station_summary <- primary_file_vert %>% 
   group_by(station) %>% 
   summarize(first_year = as.numeric(format(min(date), '%Y')),
             last_year = as.numeric(format(max(date), '%Y'))) %>% 
