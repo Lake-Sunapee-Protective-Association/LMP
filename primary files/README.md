@@ -1,6 +1,6 @@
-# LSPA LMP master files
+# LSPA LMP primary files
 
-This folder contains summary data tables, station location details, and collated, QAQC'd master files. 
+This folder contains summary data tables, station location details, and collated, QAQC'd primary files. 
 
 ***
 
@@ -67,8 +67,8 @@ This file contains a brief summary of when/how long each parameter was measured 
 
 | 	Column Name		|	Column Description															|	Units	|	Format 	|
 | 	----			|	----																		|	----	|	----	|
-|	station			|	station identifier, see [station_location_details.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/station_location_details.csv) for location lat-longs	| 	*N/A*	|	numeric	|
-|	parameter		|	parameter reported in master file (see list below)							| various, see table below	| numeric	|
+|	station			|	station identifier, see [station_location_details.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/primary%20files/station_location_details.csv) for location lat-longs	| 	*N/A*	|	numeric	|
+|	parameter		|	parameter reported in primary file (see list below)							| various, see table below	| numeric	|
 |	first_sample	| 	date of first sample of the *parameter* at a given *station*				|	*N/A*	|	date, YYYY-MM-DD |
 |	last_sample		|	date of first sample of the *parameter* at a given *station*				|	*N/A*	|	date, YYYY-MM-DD |
 |	n_obs			| 	total number of observations the given *parameter* at a given *station*		|	count	|	numeric	|
@@ -103,5 +103,5 @@ This file contains a summary of unique date/station pairs where weather conditio
 |	Column Name	|	description	|
 |	----	|	----	|
 |	date	|	date of observation in YYYY-MM-DD format	|
-|	station	|	location of observation, often this is the same at all sites, see [station_location_details.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/master%20files/station_location_details.csv) for location lat-longs	|
+|	station	|	location of observation, often this is the same at all sites, see [station_location_details.csv](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/primary%20files/station_location_details.csv) for location lat-longs	|
 |	weather	source	|	raw file stream from which the weather data were collated	|
