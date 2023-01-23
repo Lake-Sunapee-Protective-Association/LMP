@@ -23,7 +23,7 @@ Below is a map of Lake Sunapee, the lake's watershed (shaded green), and the sam
 
 ![Lake Sunapee Watershed and Sampling sites](https://github.com/Lake-Sunapee-Protective-Association/LMP/blob/main/primary%20files/LMP%20sampling%20map%20v2.jpg)
 
-The location details, as well as summaries of the available data, are listed in the [master files](https://github.com/Lake-Sunapee-Protective-Association/LMP/tree/main/primary%20files) folder.
+The location details, as well as summaries of the available data, are listed in the [primary files](https://github.com/Lake-Sunapee-Protective-Association/LMP/tree/main/primary%20files) folder.
 
 ***
 
