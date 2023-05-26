@@ -434,6 +434,7 @@ comp_bio <- comp_bio %>%
 #grab area lakes
 area_bio = comp_bio %>% 
   filter(!grepl('sunapee', LAKE, ignore.case = T))
+write.csv(area_bio, file.path(areadump, 'area_bio_subset.csv'), row.names = F)
 
 # remove unneeded variables and rename others
 raw_bio <- comp_bio %>% 
