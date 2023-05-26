@@ -5,11 +5,14 @@
 #*                                                               *
 #* TITLE:   LSPA_LMP_collation.R                                 *
 #* AUTHOR:  Bethel Steele steeleb@caryinstitute.org              *
-#* RStudio version: 2022.07.01                                   *
-#* R version: 4.2.1                                              *
+#* RStudio version: 2022.12                                      *
+#* R version: 4.2.2                                              *
 #* PURPOSE: Collate long term records of monitoring data         *
-#*          collected in Lake Sunapee                            *
-#* LAST UPDATE: v10May2022 - update through 2021 and add some    *
+#*          collected in the Lake Sunapee watershed by the LSPA  *
+#* LAST UPDATE: v25May2023 - fix site type labels and include    *
+#*                area lakes in collation                        *
+#*              v22Dec2022 - update data through 2022            *
+#*              v10May2022 - update through 2021 and add some    *
 #*                flags to previous archived data                *
 #*              v08Mar2021 - update in Git                       *
 #*              v01Mar2021 - update through 2020                 *
@@ -17,15 +20,15 @@
 #*          with data through 2019                               *
 #*          no version change 25Sept2020: updated bio and do     *
 #*          sections                                             *  
-#*              v22Dec2022 - update data through 2022            *
 #*****************************************************************
 
 # point to data directories
 datadir = 'raw data files/'
 dumpdir = 'primary files/'
+areadump = 'raw data files/area lakes subset/'
 figuredump = 'collation code/tempfigs/'
 
-library(tidyverse) #v1.3.0
+library(tidyverse) #v1.3.2
 library(readxl)
 library(ggthemes)
 
@@ -58,30 +61,34 @@ raw_chem_2021 <- read_xlsx(paste0(datadir,'2021-2022/LMPCHEM_2021_2022.xlsx'),
 
 ### collate chem data ####
 
-raw_chem <- full_join(raw_chem_2017, raw_chem_2018) %>% 
+comp_chem <- full_join(raw_chem_2017, raw_chem_2018) %>% 
   full_join(., raw_chem_2019) %>% 
   full_join(., raw_chem_2020) %>% 
   full_join(., raw_chem_2021) %>% 
   arrange(DATE)
-colnames(raw_chem)
+colnames(comp_chem)
 
 chem_vars = c("Depth","PH","H_ION","COLOR", "ALK","TP","COND","TURBIDITY","Chloride")
 
 #format chem columns to numeric
-raw_chem <- raw_chem %>%
+comp_chem <- comp_chem %>%
   mutate_at(vars(all_of(chem_vars), STATION),
             ~ as.numeric(.))
 
 # pull out sunapee from other data without station ids
-unique(raw_chem$LAKE)
-unique(raw_chem$STATION)
+unique(comp_chem$LAKE)
+unique(comp_chem$STATION)
+
+# grab area lakes
+area_chem <- comp_chem %>% 
+  filter(!grepl('sunapee', LAKE, ignore.case =T))
+write.csv(area_chem, file.path(areadump, 'area_chem_subset.csv'), row.names = F)
 
 # remove unneeded variables and rename others
-raw_chem <- raw_chem %>%
+raw_chem <- comp_chem %>%
   filter(grepl('sunapee', LAKE, ignore.case = T)) %>% #drom non-LSPA LMP sites
-  select(-"LAKE", -"TOWN", -"YEAR", -"MONTH", -"COLOR",-'H_ION', -'Date_Sta_Lr',-'CompleteDate', -'StationText') %>% #no data in COLOR or H_ION variable
+  select(-"LAKE", -"TOWN", -"YEAR", -"MONTH",-'H_ION', -'Date_Sta_Lr',-'CompleteDate', -'StationText') %>% #no data in COLOR or H_ION variable
   rename(date = DATE,
-         lake = LAKE,
          station =STATION,
          depth_m = Depth,
          layer = LAYER, 
@@ -94,15 +101,20 @@ raw_chem <- raw_chem %>%
          color_PCU = COLOR,
          org_id = ID,
          org_sampid = 'SampleID') %>% 
-  mutate(lake = toupper(lake),
-         station = case_when(station < 0 ~ NA_real_,
+  mutate(station = case_when(station < 0 ~ NA_real_,
                              TRUE ~ station)) %>% 
   mutate(site_type = case_when(station <=230 ~ 'lake',
-                              station >230 ~ 'stream',
+                              station >230 ~ 'tributary',
                               is.na(station) ~ 'new site',
-                              TRUE ~ ''))
-str(raw_chem)
+                              TRUE ~ '')) %>% 
+  relocate(station, site_type, date)
 
+#idiot check for station labels
+stations = raw_chem %>% 
+  arrange(station) %>% 
+  mutate (station_type = paste(station, site_type)) %>% 
+  distinct(station_type)
+view(stations)
 
 ### baseline chem data clean up ####
 # start with a new dataframe
@@ -114,15 +126,15 @@ qaqc_chem$layer [qaqc_chem$layer=="0"] = "O" #outlet
 qaqc_chem$layer [qaqc_chem$layer=="1"] = "I" #presumed transcription error this is a shallow location
 qaqc_chem$layer [qaqc_chem$layer=="L"] = "I" #presumed transcription error all others are integrated
 qaqc_chem$layer [qaqc_chem$layer=="N"] = "" #this is the layer for many of the early records, recoding to blank
-qaqc_chem$layer [qaqc_chem$layer=="5"] = "" #this is in a stream
+qaqc_chem$layer [qaqc_chem$layer=="5"] = "" #this is in a tributary
 unique(qaqc_chem$layer)
 
 # all stations < 110 are I
 qaqc_chem$layer [qaqc_chem$station <110 & !is.na(qaqc_chem$station) & qaqc_chem$layer == ''] = 'I'
 
-#recode depth and layer for stream samples
-qaqc_chem$depth_m [qaqc_chem$site_type=="stream"] = NA_real_
-qaqc_chem$layer [qaqc_chem$site_type=="stream"] = ""
+#recode depth and layer for tributary samples
+qaqc_chem$depth_m [qaqc_chem$site_type=="tributary"] = NA_real_
+qaqc_chem$layer [qaqc_chem$site_type=="tributary"] = ""
 
 unique(qaqc_chem$layer)
 unique(qaqc_chem$depth_m)
@@ -162,7 +174,7 @@ range(qaqc_chem$TP_mgl, na.rm = T)
 range(qaqc_chem$cond_uScm, na.rm = T)
 qaqc_chem$cond_uScm [qaqc_chem$cond_uScm<=-99] = NA
 range(qaqc_chem$cond_uScm, na.rm = T)
-#value for cond >9000 was in middle of lake - recoding, because that is obviously errant. The other values >1000 are in streams, which seems reasonable.
+#value for cond >9000 was in middle of lake - recoding, because that is obviously errant. The other values >1000 are in tributarys, which seems reasonable.
 qaqc_chem$cond_uScm [qaqc_chem$cond_uScm>9000] = NA
 range(qaqc_chem$cond_uScm, na.rm = T)
 
@@ -192,7 +204,7 @@ ggplot(qaqc_chem, aes(x = as.numeric(format(date, '%j')), y = pH, color = pH_fla
   geom_point() +  
   facet_grid(site_type~. )
 
-qaqc_chem$pH_flag [qaqc_chem$pH>7.5 & qaqc_chem$site_type == 'stream' & as.numeric(format(qaqc_chem$date, '%j'))>275] = 'high pH suspect'
+qaqc_chem$pH_flag [qaqc_chem$pH>7.5 & qaqc_chem$site_type == 'tributary' & as.numeric(format(qaqc_chem$date, '%j'))>275] = 'high pH suspect'
 
 ggplot(qaqc_chem, aes(x = as.numeric(format(date, '%j')), y = pH, color = pH_flag)) +
   geom_point() +  
@@ -214,7 +226,7 @@ qaqc_chem <- qaqc_chem %>%
   mutate(alk_flag = case_when(alk_mglCaCO3 == 0 ~ 'low alk suspect',
                               alk_mglCaCO3 > 9 & site_type == 'lake' ~ 'high alk suspect',
                               (year == 1995 | year == 1993 |  year == 1998 | year == 2000) & alk_mglCaCO3 <2.5 & site_type == 'lake' ~ 'low alk suspect',
-                              year == 1993 & site_type == 'stream' & alk_mglCaCO3 < 1.5 ~ 'low alk suspect',
+                              year == 1993 & site_type == 'tributary' & alk_mglCaCO3 < 1.5 ~ 'low alk suspect',
                               TRUE ~ ''))
 
 ggplot(qaqc_chem, aes(x = date, y = alk_mglCaCO3, color = alk_flag)) +
@@ -252,9 +264,9 @@ ggplot(qaqc_chem, aes(x = date, y = cond_uScm, color = cond_flag)) +
   geom_point(aes(shape = layer)) +
   scale_x_date(minor_breaks = '1 year')
 
-#flag low stream values
+#flag low tributary values
 qaqc_chem <- qaqc_chem %>% 
-  mutate(cond_flag = case_when(cond_uScm<9 & site_type == 'stream' ~ 'low cond suspect',
+  mutate(cond_flag = case_when(cond_uScm<9 & site_type == 'tributary' ~ 'low cond suspect',
                                TRUE ~ cond_flag))
 
 ggplot(qaqc_chem, aes(x = date, y = cond_uScm, color = cond_flag)) +
@@ -268,10 +280,10 @@ ggplot(qaqc_chem, aes(x = date, y = turb_NTU, color = depth_m)) +
   facet_grid(site_type~. , scales = 'free_y') +
   geom_point(aes(shape = layer))
 
-#flag in-lake above 30 and stream > 500 
+#flag in-lake above 30 and tributary > 500 
 qaqc_chem <- qaqc_chem %>% 
   mutate(turb_flag = case_when(turb_NTU >30 & site_type == 'lake' ~ 'high turb suspect unless recent storm', 
-                               turb_NTU >500 & site_type == 'stream' ~ 'suspect unless recent storm', 
+                               turb_NTU >500 & site_type == 'tributary' ~ 'suspect unless recent storm', 
                                TRUE ~ ''))
 
 ggplot(qaqc_chem, aes(x = date, y = turb_NTU, color = turb_flag)) +
@@ -337,13 +349,13 @@ ggplot(qaqc_chem_vert, aes(x = date, y = value, color = flag)) +
   facet_grid(parameter~site_type, scales = 'free_y') +
   theme_bw()
 
-#plot only stream data
-stream_chem_vert <- qaqc_chem_vert %>% 
-  filter(site_type == 'stream') %>% 
+#plot only tributary data
+tributary_chem_vert <- qaqc_chem_vert %>% 
+  filter(site_type == 'tributary') %>% 
   select(-depth_m, -layer)
-unique(stream_chem_vert$station)
+unique(tributary_chem_vert$station)
 
-ggplot(stream_chem_vert, aes(x = date, y = value, color = flag)) +
+ggplot(tributary_chem_vert, aes(x = date, y = value, color = flag)) +
   geom_point() +
   facet_grid(parameter~., scales = 'free_y') +
   theme_bw()
@@ -406,21 +418,26 @@ str(raw_bio_2020)
 str(raw_bio_2021)
 
 ### collate bio data ####
-raw_bio <- full_join(raw_bio_2017, raw_bio_2018) %>% 
+comp_bio <- full_join(raw_bio_2017, raw_bio_2018) %>% 
   full_join(., raw_bio_2019) %>% 
   full_join(., raw_bio_2020) %>% 
   full_join(., raw_bio_2021)
-head(raw_bio)
-colnames(raw_bio)
+head(comp_bio)
+colnames(comp_bio)
 
 
 # format bio columns to numeric
-raw_bio <- raw_bio %>% 
+comp_bio <- comp_bio %>% 
   mutate_at(vars(STATION, CHL, SD, SD_Scope, PCTPHY1, PCTPHY2, PCTPHY3),
             ~ as.numeric(.))
 
+#grab area lakes
+area_bio = comp_bio %>% 
+  filter(!grepl('sunapee', LAKE, ignore.case = T))
+write.csv(area_bio, file.path(areadump, 'area_bio_subset.csv'), row.names = F)
+
 # remove unneeded variables and rename others
-raw_bio <- raw_bio %>% 
+raw_bio <- comp_bio %>% 
   filter(grepl('sunapee', LAKE, ignore.case = T)) %>% #drop non LSPA data
   select(-"LAKE", -"TOWN", -"YEAR", -"MONTH", -'CompleteDate',- 'Date_Sta', -'StationText') %>% 
   rename(date = DATE,
@@ -436,7 +453,8 @@ raw_bio <- raw_bio %>%
          phyto_net_c = NETPHY3,
          phyto_pct_c = PCTPHY3) %>% 
   mutate(site_type = case_when(station <=230 ~ 'lake',
-                              station >230 ~ 'stream'))
+                              station >230 ~ 'tributary')) %>% 
+  relocate(station, site_type, date)
 head(raw_bio)
 
 
@@ -456,7 +474,7 @@ raw_bio <- raw_bio %>% select(-SD_Scope)
 #save into new dataframe
 qaqc_bio <- raw_bio
 
-# filter out oddball stream samples (1700)
+# filter out oddball tributary samples (1700)
 qaqc_bio <- qaqc_bio %>% 
   filter(site_type == 'lake')
 
@@ -629,17 +647,17 @@ raw_do_2021 = read_xlsx(file.path(datadir, '2021-2022/LMPDO_2021_2022.xlsx'),
 head(raw_do_2021)
 
 #### collate do data ####
-raw_do <- full_join(raw_do_2017, raw_do_2018) %>% 
+comp_do <- full_join(raw_do_2017, raw_do_2018) %>% 
   full_join(., raw_do_2019) %>% 
   full_join(., raw_do_2020) %>% 
   full_join(., raw_do_2021)
 head(raw_do)
-unique(raw_do$Comments)
-unique(raw_do$WEATHER)
-unique(raw_do$BOTTOMZ)
+unique(comp_do$Comments)
+unique(comp_do$WEATHER)
+unique(comp_do$BOTTOMZ)
 
 #### pull out weather conditions ####
-weather_obs <- raw_do %>% 
+weather_obs <- comp_do %>% 
   select(DATE, STATION, WEATHER) %>% 
   rename(date = DATE,
          station = STATION,
@@ -655,7 +673,7 @@ write_csv(weather_obs, paste0(dumpdir, 'weather_observations.csv'))
   
 
 #### pull out bottom z ####
-bottom_depth <- raw_do %>% 
+bottom_depth <- comp_do %>% 
   select(DATE, STATION, BOTTOMZ) %>% 
   rename(date = DATE,
          station = STATION,
@@ -671,7 +689,7 @@ ggplot(bottom_depth, aes(x = date, y = bottom_depth_m)) +
 #some of these look okay, but there are inconsistencies - not pushing these to the primary file at this time.
 
 #select pertinent columns
-qaqc_do <- raw_do %>% 
+qaqc_do <- comp_do %>% 
   select(STATION, DATE, DEPTH, TEMP, DO, PCNTSAT, SPC_USCM, PH, NTU, `Chl ug/L`, `Chl RFU`, ID)
 
 #format depth, temp, do columns to numeric
@@ -988,8 +1006,8 @@ head(qaqc_do)
 unique(primary_file_vert$parameter)
 unique(primary_file_vert$site_type)
 
-primary_file_stream <- primary_file_vert %>% 
-  filter(site_type == 'stream') 
+primary_file_tributary <- primary_file_vert %>% 
+  filter(site_type == 'tributary') 
 primary_file_lake <- primary_file_vert %>% 
   filter(site_type == 'lake')
 
@@ -1063,11 +1081,11 @@ write_csv(primary_file_vert, paste0(dumpdir, 'LSPALMP_1986-2022_v', Sys.Date(), 
 station <- unique(primary_file_vert$station) 
 station <- tibble(station)
 
-#add stream/lake identifier as well as site type and sub type for lake sites
+#add tributary/lake identifier as well as site type and sub type for lake sites
 station_details <- station %>% 
   mutate(station = as.numeric(station)) %>% 
   mutate(site_type = case_when((station) <= 230 ~ 'lake',
-                              TRUE ~ 'stream')) %>% 
+                              TRUE ~ 'tributary')) %>% 
   mutate(sub_site_type = case_when(site_type == 'lake' & (station) >=200 ~ 'deep',
                                    site_type == 'lake' & station <200 ~ 'cove',
                                    TRUE ~ '')) 
@@ -1099,8 +1117,8 @@ station_details <- full_join(station_details, station_summary) %>%
 
 #add lat long information as available
 templake <- read_csv(paste0(datadir, 'station locations/VLAP_LS_AddedDeepStations2020.csv'))
-tempstream <- read_csv(paste0(datadir, 'station locations/VLAP_LS_AddedTribStations2020.csv'))
-stream <- read_xls(paste0(datadir, 'station locations/tributary_pts_alt.xls')) %>% 
+temptributary <- read_csv(paste0(datadir, 'station locations/VLAP_LS_AddedTribStations2020.csv'))
+tributary <- read_xls(paste0(datadir, 'station locations/tributary_pts_alt.xls')) %>% 
   select(stream_no, lat_dd, lon_dd) %>% 
   rename(station = stream_no)  %>% 
   mutate(lat_dd = round(lat_dd, digits = 4),
@@ -1113,7 +1131,7 @@ lake <- read_xls(paste0(datadir, 'station locations/Cove  Deep + Buoy WQ Sample 
          lon_dd = round(X, digits = 4)) %>% 
   select(station, lat_dd, lon_dd)
   
-temp <- full_join(templake, tempstream) %>% 
+temp <- full_join(templake, temptributary) %>% 
   select(AliasID, LATDECDEG, LONGDECDEG) %>% 
   rename(station = AliasID, 
          lat_dd = LATDECDEG,
@@ -1121,7 +1139,7 @@ temp <- full_join(templake, tempstream) %>%
   mutate(lat_dd = round(lat_dd, digits = 4),
          lon_dd = round(lon_dd, digits = 4))
 
-station_locs <- full_join(stream, lake) %>% 
+station_locs <- full_join(tributary, lake) %>% 
   full_join(temp)
 
 station_details <- full_join(station_details, station_locs)
