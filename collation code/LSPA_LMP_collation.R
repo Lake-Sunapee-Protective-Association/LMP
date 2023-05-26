@@ -25,6 +25,7 @@
 # point to data directories
 datadir = 'raw data files/'
 dumpdir = 'primary files/'
+areadump = 'raw data files/area lakes subset/'
 figuredump = 'collation code/tempfigs/'
 
 library(tidyverse) #v1.3.2
@@ -81,6 +82,7 @@ unique(comp_chem$STATION)
 # grab area lakes
 area_chem <- comp_chem %>% 
   filter(!grepl('sunapee', LAKE, ignore.case =T))
+write.csv(area_chem, file.path(areadump, 'area_chem_subset.csv'), row.names = F)
 
 # remove unneeded variables and rename others
 raw_chem <- comp_chem %>%
