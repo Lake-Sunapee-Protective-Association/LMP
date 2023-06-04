@@ -9,8 +9,9 @@
 #* R version: 4.2.2                                              *
 #* PURPOSE: Collate long term records of monitoring data         *
 #*          collected in the Lake Sunapee watershed by the LSPA  *
-#* LAST UPDATE: v25May2023 - fix site type labels and include    *
-#*                area lakes in collation                        *
+#* LAST UPDATE: v25May2023 - fix site type labels, include       *
+#*                area lakes in collation, supplement 2021       *
+#*                DO data with ProDSS backup files               *
 #*              v22Dec2022 - update data through 2022            *
 #*              v10May2022 - update through 2021 and add some    *
 #*                flags to previous archived data                *
@@ -29,6 +30,7 @@ areadump = 'raw data files/area lakes subset/'
 figuredump = 'collation code/tempfigs/'
 
 library(tidyverse) #v1.3.2
+library(lubridate)
 library(readxl)
 library(ggthemes)
 
@@ -103,8 +105,8 @@ raw_chem <- comp_chem %>%
          org_sampid = 'SampleID') %>% 
   mutate(station = case_when(station < 0 ~ NA_real_,
                              TRUE ~ station)) %>% 
-  mutate(site_type = case_when(station <=230 ~ 'lake',
-                              station >230 ~ 'tributary',
+  mutate(site_type = case_when(station <500 ~ 'lake',
+                              station >=500 ~ 'tributary',
                               is.na(station) ~ 'new site',
                               TRUE ~ '')) %>% 
   relocate(station, site_type, date)
@@ -193,7 +195,7 @@ ggplot(qaqc_chem, aes(x = date, y = pH)) +
 #recode the data in lake above 10
 qaqc_chem$pH [qaqc_chem$pH>10] = NA
 qaqc_chem$pH_flag = ''
-qaqc_chem$pH_flag [qaqc_chem$pH<5.5 & qaqc_chem$site_type == 'lake'] = 'low pH suspect'
+qaqc_chem$pH_flag [qaqc_chem$pH<5 & qaqc_chem$site_type == 'lake'] = 'low pH suspect'
 
 #replot
 ggplot(qaqc_chem, aes(x = date, y = pH, color = pH_flag)) +
@@ -283,7 +285,7 @@ ggplot(qaqc_chem, aes(x = date, y = turb_NTU, color = depth_m)) +
 #flag in-lake above 30 and tributary > 500 
 qaqc_chem <- qaqc_chem %>% 
   mutate(turb_flag = case_when(turb_NTU >30 & site_type == 'lake' ~ 'high turb suspect unless recent storm', 
-                               turb_NTU >500 & site_type == 'tributary' ~ 'suspect unless recent storm', 
+                               turb_NTU >500 & site_type == 'tributary' ~ 'high turb suspect unless recent storm', 
                                TRUE ~ ''))
 
 ggplot(qaqc_chem, aes(x = date, y = turb_NTU, color = turb_flag)) +
@@ -452,8 +454,8 @@ raw_bio <- comp_bio %>%
          phyto_pct_b = PCTPHY2,
          phyto_net_c = NETPHY3,
          phyto_pct_c = PCTPHY3) %>% 
-  mutate(site_type = case_when(station <=230 ~ 'lake',
-                              station >230 ~ 'tributary')) %>% 
+  mutate(site_type = case_when(station <500 ~ 'lake',
+                              station >= 500 ~ 'tributary')) %>% 
   relocate(station, site_type, date)
 head(raw_bio)
 
@@ -462,7 +464,7 @@ head(raw_bio)
 raw_bio %>% 
   filter(!is.na(SD_Scope)) %>% 
   filter(secchidepth_m != SD_Scope)
-#these are all the same
+#these are all the same (aka nrow = 0)
 raw_bio %>%
   filter(!is.na(SD_Scope) & is.na(secchidepth_m))
 # there are no instances where scope has data that other doesn't, we can drop this column
@@ -646,12 +648,62 @@ raw_do_2021 = read_xlsx(file.path(datadir, '2021-2022/LMPDO_2021_2022.xlsx'),
          PH = pH)
 head(raw_do_2021)
 
-#### collate do data ####
+#### read in prodss files from 2021 ----
+dss_cols = c('DATE', 'TIME', 'STATION', 'unit_id',
+             'TEMP', 'mbars', 'PCNTSAT',
+             'DO', 'SPC_USCM', 'PH', 'NTU', 
+             'Chl ug/L', 'Chl RFU', 'DEPTH')
+#helper function
+read_dss = function(file) {
+  read_csv(file,
+           col_types = cols(.default = "c"),
+           col_names = dss_cols,
+           skip =1)
+}
+prodss_dir = 'raw data files/ProDSS/'
+prodss_files_2021 = list.files(file.path(prodss_dir, '2021'), pattern = '.csv')
+prodss_2021 = map_dfr(file.path(prodss_dir, '2021', prodss_files_2021), read_dss)
+
+#check to see unique dates
+unique(prodss_2021$DATE)
+
+#and format the data to join it with lmp
+prodss_2021 <- prodss_2021 %>% 
+  mutate(DATE = mdy(DATE)) %>%  #warnings okay, there are some oddball colnames that find there way in here
+  filter(!is.na(DATE))
+
+#check to see unique dates
+unique(prodss_2021$DATE)
+
+#remove the two dates that were originally in the LMP
+dates_2021 = c(date('2021-06-08'), date('2021-02-23'))
+
+prodss_2021 <- prodss_2021 %>% 
+  filter(!(DATE %in% dates_2021)) %>% 
+  mutate(TIME = as.character(TIME))
+
+# check colnames of prodss_2021 and raw_do_2021
+colnames(prodss_2021)
+colnames(raw_do_2021)
+
+#format to match raw_do_2021
+prodss_2021 <- prodss_2021 %>% 
+  mutate(LAKE = 'SUNAPEE, LAKE',
+         TOWN = 'SUNAPEE') %>% 
+  select(-c(unit_id, mbars))
+
+#### collate do data #### 
 comp_do <- full_join(raw_do_2017, raw_do_2018) %>% 
   full_join(., raw_do_2019) %>% 
   full_join(., raw_do_2020) %>% 
-  full_join(., raw_do_2021)
-head(raw_do)
+  full_join(., raw_do_2021) %>% 
+  full_join(., prodss_2021) %>% 
+  mutate_at(vars(STATION, TEMP, PCNTSAT, DO, 
+                 SPC_USCM, PH, NTU, DEPTH,
+                 `Chl ug/L`, `Chl RFU`),
+            ~(as.numeric(.)))
+
+head(comp_do)
 unique(comp_do$Comments)
 unique(comp_do$WEATHER)
 unique(comp_do$BOTTOMZ)
@@ -671,7 +723,6 @@ weather_obs <- unique(weather_obs) %>%
 
 write_csv(weather_obs, paste0(dumpdir, 'weather_observations.csv'))
   
-
 #### pull out bottom z ####
 bottom_depth <- comp_do %>% 
   select(DATE, STATION, BOTTOMZ) %>% 
@@ -725,8 +776,12 @@ range(qaqc_do$SPC_USCM, na.rm = T)
 #again, zero
 
 range(qaqc_do$`Chl RFU`, na.rm = T)
+qaqc_do$`Chl RFU` [qaqc_do$`Chl RFU` < 0] = NA_real_
+range(qaqc_do$`Chl RFU`, na.rm = T)
 #0s
 
+range(qaqc_do$`Chl ug/L`, na.rm = T)
+qaqc_do$`Chl ug/L` [qaqc_do$`Chl ug/L` < 0] = NA_real_
 range(qaqc_do$`Chl ug/L`, na.rm = T)
 #0s
 
@@ -784,13 +839,15 @@ for(i in 1:length(years)){
   DF <- qaqc_do %>% 
     filter(DATE >= paste(years[i], '01', '01', sep='-') &
              DATE < paste(years[i]+1, '01', '01', sep='-'))
-  PLOT <- ggplot(DF, aes(x = DATE, y = DO, color = do_flag, shape = STATION)) +
+  PLOT <- ggplot(DF, aes(x = DATE, y = DO, color = STATION, shape = do_flag)) +
     geom_point() +
     labs(title = years[i]) +
     coord_cartesian(ylim = c(0,max(qaqc_do$DO, na.rm = T)))
   print(PLOT)
 }
 dev.off()
+
+#there are some low values in here in 2019 forward, presumably at depth that may be sonde-in-sed
 
 ##### percent saturation ####
 ggplot(qaqc_do, aes(x = DATE, y = PCNTSAT)) +
@@ -804,10 +861,10 @@ ggplot(qaqc_do, aes(x = DATE, y = PCNTSAT)) +
 
 # add flag to site 210 data on 1994-07-29 seems too high
 qaqc_do <- qaqc_do %>% 
-  mutate(do_flag = case_when(DATE == as.Date('1994-07-29') & do_flag == '' ~'likely do calibration issue on this date - do sat very high',
-                             DATE == as.Date('2008-07-01') & do_flag == '' ~ 'possible do calibration issue on this date - do sat very high at 210',
-                             DATE == as.Date('1994-07-29') & do_flag != '' ~  paste(do_flag, 'likely do calibration issue on this date - do sat very high', sep = '; '),
-                             DATE == as.Date('2008-07-01') & do_flag != '' ~  paste(do_flag, 'possible do calibration issue on this date - do sat very high at 210', sep = '; '),
+  mutate(do_flag = case_when((DATE == as.Date('1994-07-29') |
+                                DATE == as.Date('2008-07-01')) & do_flag == '' ~ 'possible do calibration issue on this date - do sat very high',
+                             (DATE == as.Date('1994-07-29')|
+                                DATE == as.Date('2008-07-01')) & do_flag != '' ~  paste(do_flag, 'possible do calibration issue on this date - do sat very high', sep = '; '),
                              TRUE ~ do_flag)) 
 ggplot(qaqc_do, aes(x = DATE, y = PCNTSAT, color = do_flag)) +
   geom_point()
@@ -819,7 +876,7 @@ for(i in 1:length(years)){
   DF <- qaqc_do %>% 
     filter(DATE >= paste(years[i], '01', '01', sep='-') &
              DATE < paste(years[i]+1, '01', '01', sep='-'))
-  PLOT <- ggplot(DF, aes(x = DATE, y = PCNTSAT, color = do_flag, shape = STATION)) +
+  PLOT <- ggplot(DF, aes(x = DATE, y = PCNTSAT, color = STATION, shape = do_flag)) +
     geom_point() +
     labs(title = years[i]) +
     coord_cartesian(ylim = c(0,max(qaqc_do$PCNTSAT, na.rm = T)))
@@ -844,7 +901,7 @@ for(i in 1:length(years)){
   DF <- qaqc_do %>% 
     filter(DATE >= paste(years[i], '01', '01', sep='-') &
              DATE < paste(years[i]+1, '01', '01', sep='-'))
-  PLOT <- ggplot(DF, aes(x = DATE, y = PCNTSAT, color = do_flag, shape = STATION)) +
+  PLOT <- ggplot(DF, aes(x = DATE, y = PCNTSAT, color = STATION, shape = do_flag)) +
     geom_point() +
     labs(title = years[i]) +
     coord_cartesian(ylim = c(0,max(qaqc_do$PCNTSAT, na.rm = T)))
@@ -864,8 +921,11 @@ remove = qaqc_do %>%
 
 qaqc_do = anti_join(qaqc_do, remove)
 
-#values where temp less than 2 are incorrect, recoding the do data as well, since those are temp based
-ix = which(qaqc_do$TEMP<2 & format(qaqc_do$DATE, '%Y') < 2020)
+ggplot(qaqc_do, aes(x = DATE, y = TEMP)) +
+  geom_point()
+
+#values < 1 prior to 2021 are errant.
+ix = which(qaqc_do$TEMP<1 & format(qaqc_do$DATE, '%Y') < 2021)
 
 qaqc_do$TEMP[ix] = NA_real_
 qaqc_do$DO[ix] = NA_real_
@@ -886,6 +946,9 @@ ggplot(qaqc_do, aes(x = DATE, y = PH)) +
 
 #recode 0 to na
 qaqc_do$PH = ifelse(qaqc_do$PH == 0, NA_real_, qaqc_do$PH)
+
+ggplot(qaqc_do, aes(x = DATE, y = PH)) +
+  geom_point()
 
 # calculate H+ ion from pH (H+ = 10^-pH) and drop pH column
 qaqc_do$conc_H_molpl=10^(qaqc_do$PH * -1)
@@ -915,8 +978,11 @@ ggplot(qaqc_do, aes(x = DATE, y = `Chl ug/L`)) +
 qaqc_do$`Chl ug/L` = ifelse(qaqc_do$`Chl ug/L` == 0, NA_real_, qaqc_do$`Chl ug/L`)
 qaqc_do$`Chl RFU` = ifelse(qaqc_do$`Chl RFU` == 0, NA_real_, qaqc_do$`Chl RFU`)
 
+ggplot(qaqc_do, aes(x = DATE, y = `Chl RFU`)) +
+  geom_point()
+
 # and flag rfu > 1 as suspect
-qaqc_do$chl_flag = ifelse(qaqc_do$`Chl RFU`>1, 'suspect', '')
+qaqc_do$chl_flag = ifelse(qaqc_do$`Chl RFU`>1|is.na(qaqc_do$`Chl RFU`), 'suspect', '')
 
 #### look at 2020 data to see better the relationship between parameters that are suspected in the sediment
 do20 <- qaqc_do %>% 
@@ -943,11 +1009,20 @@ ggplot(do20, aes(x = DATE, y = value, color = DEPTH))+
   facet_grid(variable ~ ., scales = 'free_y') +
   theme_bw()
 
-# flagging anything greater than 10 NTU as suspect data
+# flagging anything greater than 20 NTU as suspect data
 qaqc_do <- qaqc_do %>% 
   mutate(gen_flag = case_when(NTU>10 ~ 'sonde suspected in sediment',
                               TRUE ~ ''))
 
+#look again
+do20 <- qaqc_do %>% 
+  filter(DATE > '2020-01-01') %>% 
+  pivot_longer(cols = c(TEMP:NTU, `Chl ug/L`, `Chl RFU`), names_to = 'variable')
+
+ggplot(do20, aes(x = DATE, y = value, color = DEPTH, shape = gen_flag))+
+  geom_point() +
+  facet_grid(variable ~ ., scales = 'free_y') +
+  theme_bw()
 
 #### rename columns ####
 qaqc_do <- qaqc_do %>% 
@@ -1084,7 +1159,7 @@ station <- tibble(station)
 #add tributary/lake identifier as well as site type and sub type for lake sites
 station_details <- station %>% 
   mutate(station = as.numeric(station)) %>% 
-  mutate(site_type = case_when((station) <= 230 ~ 'lake',
+  mutate(site_type = case_when((station) <= 500 ~ 'lake',
                               TRUE ~ 'tributary')) %>% 
   mutate(sub_site_type = case_when(site_type == 'lake' & (station) >=200 ~ 'deep',
                                    site_type == 'lake' & station <200 ~ 'cove',
@@ -1110,9 +1185,9 @@ station_summary <- primary_file_vert %>%
   mutate(station = as.numeric(station))
 
 station_details <- full_join(station_details, station_summary) %>% 
-  mutate(status = case_when(last_year >= 2020 ~ 'ongoing',
+  mutate(status = case_when(last_year >= 2022 ~ 'ongoing',
                             TRUE ~ 'inactive'),
-         status = case_when(first_year == 2020 ~ 'temporary',
+         status = case_when(first_year == last_year ~ 'temporary',
                             TRUE ~ status))
 
 #add lat long information as available
