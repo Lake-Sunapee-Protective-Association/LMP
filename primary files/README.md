@@ -16,7 +16,7 @@ This is the collated file of all LSPA LMP data as collated and QAQC'd in the cod
 |	date	|	date of observation, measurement, or sample	|	*N/A*	|	YYYY-MM-DD	|
 |	depth_m	|	depth of observation, measurement, or sample if applicable	|	meters	|	numeric	|
 |	layer	|	layer from which an observation, measurement, or sample was taken, if applicable	|	I = integrated, E = epilimnion, M = metalimnion, H = hypolimnion	|	character	|
-|	site_type	|	indication of 'lake' site or 'stream' site	|	*N/A*	| character string	|
+|	site_type	|	indication of 'lake' site or 'tributary' site	|	*N/A*	| character string	|
 |	parameter	| 	parameter for which *value* is reported, see table below for parameter descriptions and units	|	*N/A*	|	character string	|
 |	value	|	value of the *parameter* measured at *station* on *date* at *depth_m* or *layer*	|	various, see parameter units below	|	numeric	|
 |	flag	|	use flag for *parameter*-*value* reported	|	*N/A*	|	character string, 'BDL' = 'below detection limit', all flags indicate use-with-caution	|	
@@ -50,7 +50,7 @@ This file contains all station location information available from the LSPA. Not
 | 	Column Name		|	Column Description															|	Units	|	Format 	|
 | 	----			|	----																		|	----	|	----	|
 |	station			|	station identifier															| 	*N/A*	|	numeric	|
-|	site_type		|	site type indicating whether sample obtained in "lake" or "stream"			|	*N/A*	|	character	|
+|	site_type		|	site type indicating whether sample obtained in "lake" or "tributary"			|	*N/A*	|	character	|
 |	sub_site_type	| 	"cove" (shallow) or "deep" location; applicable only for "lake" site_type	| 	*N/A*	|	character	|
 |	first_year		|	first year station was sampled at											|	*N/A*	|	numeric YYYY	|
 |	last_year		|	last year station was sampled at											|	*N/A*	|	numeric YYYY	|
@@ -72,7 +72,7 @@ This file contains a brief summary of when/how long each parameter was measured 
 |	first_sample	| 	date of first sample of the *parameter* at a given *station*				|	*N/A*	|	date, YYYY-MM-DD |
 |	last_sample		|	date of first sample of the *parameter* at a given *station*				|	*N/A*	|	date, YYYY-MM-DD |
 |	n_obs			| 	total number of observations the given *parameter* at a given *station*		|	count	|	numeric	|
-|	site_type		|	site type indicating whether sample obtained in "lake" or "stream"			|	*N/A*	|	character	|
+|	site_type		|	site type indicating whether sample obtained in "lake" or "tributary"			|	*N/A*	|	character	|
 |	sub_site_type	| 	"cove" (shallow) or "deep" location; applicable only for "lake" site_type	| 	*N/A*	|	character	|
 
 
