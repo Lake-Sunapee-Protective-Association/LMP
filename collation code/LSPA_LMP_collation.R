@@ -9,8 +9,9 @@
 #* R version: 4.2.2                                              *
 #* PURPOSE: Collate long term records of monitoring data         *
 #*          collected in the Lake Sunapee watershed by the LSPA  *
-#* LAST UPDATE: v25May2023 - fix site type labels and include    *
-#*                area lakes in collation                        *
+#* LAST UPDATE: v25May2023 - fix site type labels, include       *
+#*                area lakes in collation, supplement 2021       *
+#*                DO data with ProDSS backup files               *
 #*              v22Dec2022 - update data through 2022            *
 #*              v10May2022 - update through 2021 and add some    *
 #*                flags to previous archived data                *
@@ -649,12 +650,13 @@ head(raw_do_2021)
 
 #### read in prodss files from 2021 ----
 dss_cols = c('DATE', 'TIME', 'STATION', 'unit_id',
-             'TEMP', 'mbars', 'PCTNSAT',
+             'TEMP', 'mbars', 'PCNTSAT',
              'DO', 'SPC_USCM', 'PH', 'NTU', 
              'Chl ug/L', 'Chl RFU', 'DEPTH')
 #helper function
 read_dss = function(file) {
   read_csv(file,
+           col_types = cols(.default = "c"),
            col_names = dss_cols,
            skip =1)
 }
@@ -667,7 +669,11 @@ unique(prodss_2021$DATE)
 
 #and format the data to join it with lmp
 prodss_2021 <- prodss_2021 %>% 
-  mutate(DATE = mdy(DATE))
+  mutate(DATE = mdy(DATE)) %>%  #warnings okay, there are some oddball colnames that find there way in here
+  filter(!is.na(DATE))
+
+#check to see unique dates
+unique(prodss_2021$DATE)
 
 #remove the two dates that were originally in the LMP
 dates_2021 = c(date('2021-06-08'), date('2021-02-23'))
@@ -676,16 +682,26 @@ prodss_2021 <- prodss_2021 %>%
   filter(!(DATE %in% dates_2021)) %>% 
   mutate(TIME = as.character(TIME))
 
-#### collate do data ####
+# check colnames of prodss_2021 and raw_do_2021
+colnames(prodss_2021)
+colnames(raw_do_2021)
+
+#format to match raw_do_2021
+prodss_2021 <- prodss_2021 %>% 
+  mutate(LAKE = 'SUNAPEE, LAKE',
+         TOWN = 'SUNAPEE') %>% 
+  select(-c(unit_id, mbars))
+
+#### collate do data #### 
 comp_do <- full_join(raw_do_2017, raw_do_2018) %>% 
   full_join(., raw_do_2019) %>% 
   full_join(., raw_do_2020) %>% 
   full_join(., raw_do_2021) %>% 
+  full_join(., prodss_2021) %>% 
   mutate_at(vars(STATION, TEMP, PCNTSAT, DO, 
                  SPC_USCM, PH, NTU, DEPTH,
                  `Chl ug/L`, `Chl RFU`),
-            ~(as.numeric(.))) %>% 
-  full_join(., prodss_2021)
+            ~(as.numeric(.)))
 
 head(comp_do)
 unique(comp_do$Comments)
@@ -707,7 +723,6 @@ weather_obs <- unique(weather_obs) %>%
 
 write_csv(weather_obs, paste0(dumpdir, 'weather_observations.csv'))
   
-
 #### pull out bottom z ####
 bottom_depth <- comp_do %>% 
   select(DATE, STATION, BOTTOMZ) %>% 
@@ -824,13 +839,15 @@ for(i in 1:length(years)){
   DF <- qaqc_do %>% 
     filter(DATE >= paste(years[i], '01', '01', sep='-') &
              DATE < paste(years[i]+1, '01', '01', sep='-'))
-  PLOT <- ggplot(DF, aes(x = DATE, y = DO, color = do_flag, shape = STATION)) +
+  PLOT <- ggplot(DF, aes(x = DATE, y = DO, color = STATION, shape = do_flag)) +
     geom_point() +
     labs(title = years[i]) +
     coord_cartesian(ylim = c(0,max(qaqc_do$DO, na.rm = T)))
   print(PLOT)
 }
 dev.off()
+
+#there are some low values in here in 2019 forward, presumably at depth that may be sonde-in-sed
 
 ##### percent saturation ####
 ggplot(qaqc_do, aes(x = DATE, y = PCNTSAT)) +
@@ -859,7 +876,7 @@ for(i in 1:length(years)){
   DF <- qaqc_do %>% 
     filter(DATE >= paste(years[i], '01', '01', sep='-') &
              DATE < paste(years[i]+1, '01', '01', sep='-'))
-  PLOT <- ggplot(DF, aes(x = DATE, y = PCNTSAT, color = do_flag, shape = STATION)) +
+  PLOT <- ggplot(DF, aes(x = DATE, y = PCNTSAT, color = STATION, shape = do_flag)) +
     geom_point() +
     labs(title = years[i]) +
     coord_cartesian(ylim = c(0,max(qaqc_do$PCNTSAT, na.rm = T)))
@@ -884,7 +901,7 @@ for(i in 1:length(years)){
   DF <- qaqc_do %>% 
     filter(DATE >= paste(years[i], '01', '01', sep='-') &
              DATE < paste(years[i]+1, '01', '01', sep='-'))
-  PLOT <- ggplot(DF, aes(x = DATE, y = PCNTSAT, color = do_flag, shape = STATION)) +
+  PLOT <- ggplot(DF, aes(x = DATE, y = PCNTSAT, color = STATION, shape = do_flag)) +
     geom_point() +
     labs(title = years[i]) +
     coord_cartesian(ylim = c(0,max(qaqc_do$PCNTSAT, na.rm = T)))
@@ -904,8 +921,11 @@ remove = qaqc_do %>%
 
 qaqc_do = anti_join(qaqc_do, remove)
 
-#values where temp less than 2 are incorrect, recoding the do data as well, since those are temp based
-ix = which(qaqc_do$TEMP<2 & format(qaqc_do$DATE, '%Y') < 2020)
+ggplot(qaqc_do, aes(x = DATE, y = TEMP)) +
+  geom_point()
+
+#values < 1 prior to 2021 are errant.
+ix = which(qaqc_do$TEMP<1 & format(qaqc_do$DATE, '%Y') < 2021)
 
 qaqc_do$TEMP[ix] = NA_real_
 qaqc_do$DO[ix] = NA_real_
@@ -958,8 +978,11 @@ ggplot(qaqc_do, aes(x = DATE, y = `Chl ug/L`)) +
 qaqc_do$`Chl ug/L` = ifelse(qaqc_do$`Chl ug/L` == 0, NA_real_, qaqc_do$`Chl ug/L`)
 qaqc_do$`Chl RFU` = ifelse(qaqc_do$`Chl RFU` == 0, NA_real_, qaqc_do$`Chl RFU`)
 
+ggplot(qaqc_do, aes(x = DATE, y = `Chl RFU`)) +
+  geom_point()
+
 # and flag rfu > 1 as suspect
-qaqc_do$chl_flag = ifelse(qaqc_do$`Chl RFU`>1, 'suspect', '')
+qaqc_do$chl_flag = ifelse(qaqc_do$`Chl RFU`>1|is.na(qaqc_do$`Chl RFU`), 'suspect', '')
 
 #### look at 2020 data to see better the relationship between parameters that are suspected in the sediment
 do20 <- qaqc_do %>% 
@@ -986,11 +1009,20 @@ ggplot(do20, aes(x = DATE, y = value, color = DEPTH))+
   facet_grid(variable ~ ., scales = 'free_y') +
   theme_bw()
 
-# flagging anything greater than 10 NTU as suspect data
+# flagging anything greater than 20 NTU as suspect data
 qaqc_do <- qaqc_do %>% 
   mutate(gen_flag = case_when(NTU>10 ~ 'sonde suspected in sediment',
                               TRUE ~ ''))
 
+#look again
+do20 <- qaqc_do %>% 
+  filter(DATE > '2020-01-01') %>% 
+  pivot_longer(cols = c(TEMP:NTU, `Chl ug/L`, `Chl RFU`), names_to = 'variable')
+
+ggplot(do20, aes(x = DATE, y = value, color = DEPTH, shape = gen_flag))+
+  geom_point() +
+  facet_grid(variable ~ ., scales = 'free_y') +
+  theme_bw()
 
 #### rename columns ####
 qaqc_do <- qaqc_do %>% 
@@ -1127,7 +1159,7 @@ station <- tibble(station)
 #add tributary/lake identifier as well as site type and sub type for lake sites
 station_details <- station %>% 
   mutate(station = as.numeric(station)) %>% 
-  mutate(site_type = case_when((station) <= 230 ~ 'lake',
+  mutate(site_type = case_when((station) <= 500 ~ 'lake',
                               TRUE ~ 'tributary')) %>% 
   mutate(sub_site_type = case_when(site_type == 'lake' & (station) >=200 ~ 'deep',
                                    site_type == 'lake' & station <200 ~ 'cove',
@@ -1153,9 +1185,9 @@ station_summary <- primary_file_vert %>%
   mutate(station = as.numeric(station))
 
 station_details <- full_join(station_details, station_summary) %>% 
-  mutate(status = case_when(last_year >= 2020 ~ 'ongoing',
+  mutate(status = case_when(last_year >= 2022 ~ 'ongoing',
                             TRUE ~ 'inactive'),
-         status = case_when(first_year == 2020 ~ 'temporary',
+         status = case_when(first_year == last_year ~ 'temporary',
                             TRUE ~ status))
 
 #add lat long information as available
