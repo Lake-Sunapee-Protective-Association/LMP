@@ -5,11 +5,12 @@
 #*                                                               *
 #* TITLE:   LSPA_LMP_collation.R                                 *
 #* AUTHOR:  Bethel Steele steeleb@caryinstitute.org              *
-#* RStudio version: 2023.12                                      *
-#* R version: 4.3.2                                              *
+#* RStudio version: 2024.12.0                                      *
+#* R version: 4.4.0                                              *
 #* PURPOSE: Collate long term records of monitoring data         *
 #*          collected in the Lake Sunapee watershed by the LSPA  *
-#* LAST UPDATE: v13Jan2024 - update through 2023, recode zero    *
+#* LAST UPDATE: v28Mar2025 - update through 2024
+#*              v13Jan2024 - update through 2023, recode zero    *
 #*                secchi to NA                                   *
 #*              v25May2023 - fix site type labels, include       *
 #*                area lakes in collation, supplement 2021       *
@@ -31,7 +32,7 @@ dumpdir = 'primary files/'
 areadump = 'raw data files/area lakes subset/'
 figuredump = 'collation code/tempfigs/'
 
-library(tidyverse) #v1.3.2
+library(tidyverse) #v2.0.0
 library(readxl)
 library(ggthemes)
 
@@ -45,8 +46,8 @@ library(ggthemes)
 
 # import data
 raw_chem_2017 <- read_xlsx(paste0(datadir, "1986-2017/CHEMISTRY.xlsx"), 
-                      sheet="CHEMISTRY",
-                      col_types = 'text') %>% 
+                           sheet="CHEMISTRY",
+                           col_types = 'text') %>% 
   mutate(DATE = as.Date(as.numeric(DATE), origin = '1899-12-30'))
 raw_chem_2018 <- read_csv(paste0(datadir, "2018/Sunapee 2018 Chem.csv"),
                           col_types = cols(.default = col_character())) %>% 
@@ -58,14 +59,25 @@ raw_chem_2020 <- read_csv(paste0(datadir,'2020/Sunapee2020CHEM.csv'),
                           col_types = cols(.default = col_character()))%>% 
   mutate(DATE = as.Date(DATE, format = '%d-%b-%y'))
 raw_chem_2021 <- read_xlsx(paste0(datadir,'2021-2022/LMPCHEM_2021_2022.xlsx'),
-                          col_types = 'text') %>% 
+                           col_types = 'text') %>% 
   mutate(DATE = as.Date(as.numeric(DATE), origin = '1899-12-30'))
 raw_chem_2023 <- read_xlsx(file.path(datadir, '2023/LMPCHEM_2023_LS.xlsx'),
-                          col_types = 'text') %>% 
+                           col_types = 'text') %>% 
   mutate(DATE = as.Date(as.numeric(DATE), origin = '1899-12-30')) %>% 
   mutate(STATION = if_else(STATION == "-9999", # one date station is in text
                            "040",
                            STATION))
+raw_chem_2024 <- read_xlsx(file.path(datadir, "2024/LMPCHEM_2024_LakeSunapee.xlsx")) %>% 
+  mutate(STATION = if_else(STATION == "-9999", # one date station is in text
+                           "040",
+                           as.character(STATION)),
+         Depth = as.character(Depth),
+         TIME = format(DATE, "%H:%M"),
+         DATE = date(DATE),
+         across(.cols = PH:CHL, .fns = as.character),
+         YEAR = as.character(YEAR),
+         CompleteDate = as.character(CompleteDate),
+         ID = as.character(ID))
 
 ### collate chem data ####
 
@@ -74,10 +86,11 @@ comp_chem <- full_join(raw_chem_2017, raw_chem_2018) %>%
   full_join(., raw_chem_2020) %>% 
   full_join(., raw_chem_2021) %>% 
   full_join(., raw_chem_2023) %>%
+  full_join(., raw_chem_2024) %>% 
   arrange(DATE)
 colnames(comp_chem)
 
-# drop secchi depth and scope columns and chlorophyll
+# drop secchi depth and scope columns and chlorophyll (these will come back under biological data)
 comp_chem <- comp_chem %>% 
   select(-SD, -SD_Scope, -CHL)
 
@@ -85,8 +98,8 @@ chem_vars = c("Depth","PH","H_ION","COLOR", "ALK","TP","COND","TURBIDITY","Chlor
 
 #format chem columns to numeric
 comp_chem <- comp_chem %>%
-  mutate_at(vars(all_of(chem_vars), STATION),
-            ~ as.numeric(.))
+  mutate(across(.cols = c(all_of(chem_vars), STATION),
+                .fns = as.numeric))
 
 # pull out sunapee from other data without station ids
 unique(comp_chem$LAKE)
@@ -95,14 +108,20 @@ unique(comp_chem$STATION)
 # grab area lakes
 area_chem <- comp_chem %>% 
   filter(!grepl('sunapee', LAKE, ignore.case =T))
-write.csv(area_chem, file.path(areadump, 'area_chem_subset.csv'), row.names = F)
+write_csv(area_chem, file.path(areadump, 'area_chem_subset.csv'))
 
 # remove unneeded variables and rename others
 raw_chem <- comp_chem %>%
-  filter(grepl('sunapee', LAKE, ignore.case = T)) %>% #drom non-LSPA LMP sites
-  select(-"LAKE", -"TOWN", -"YEAR", -"MONTH",-'H_ION', -'Date_Sta_Lr',-'CompleteDate', -'StationText') %>% #no data in COLOR or H_ION variable
+  filter(grepl('sunapee', LAKE, ignore.case = T)) %>% #drop non-LSPA LMP sites
+  # move info from StationText to Comments if includes numeric values (indicating detph), otherwise
+  # it is a repeat of layer information
+  mutate(Comments = case_when(grepl("[0-9]", StationText) & is.na(Comments) ~ StationText,
+                              grepl("[0-9]", StationText) & !is.na(Comments) ~ paste(StationText, Comments, sep = "; "),
+                              .default = Comments)) %>% 
+  select(-c("LAKE", "TOWN", "YEAR", "MONTH", 'H_ION', 'Date_Sta_Lr', 'CompleteDate', 'StationText')) %>% #no data in H_ION variable
   rename(date = DATE,
-         station =STATION,
+         time = TIME,
+         station = STATION,
          depth_m = Depth,
          layer = LAYER, 
          pH = PH,
@@ -117,17 +136,22 @@ raw_chem <- comp_chem %>%
   mutate(station = case_when(station < 0 ~ NA_real_,
                              TRUE ~ station)) %>% 
   mutate(site_type = case_when(station <500 ~ 'lake',
-                              station >=500 ~ 'tributary',
-                              is.na(station) ~ 'new site',
-                              TRUE ~ '')) %>% 
-  relocate(station, site_type, date)
+                               station >=500 ~ 'tributary',
+                               is.na(station) ~ 'new site',
+                               TRUE ~ '')) %>% 
+  relocate(station, site_type, date) %>% 
+  # recode for NA holders
+  mutate(across(.cols = c(pH, alk_mglCaCO3, cond_uScm, turb_NTU, color_PCU, cl_mgl),
+                .fns = ~ if_else(. < 0,
+                                 NA_real_,
+                                 .)),
+         TP_mgl = if_else(TP_mgl <= -99, NA_real_, TP_mgl))
 
 #idiot check for station labels
 stations = raw_chem %>% 
   arrange(station) %>% 
   mutate (station_type = paste(station, site_type)) %>% 
   distinct(station_type)
-view(stations)
 
 ### baseline chem data clean up ####
 # start with a new dataframe
@@ -157,23 +181,16 @@ colnames(qaqc_chem)
 
 # set missing data to NA
 range(qaqc_chem$pH, na.rm = T)
-qaqc_chem$pH [qaqc_chem$pH==-99] = NA
-range(qaqc_chem$pH, na.rm = T)
 qaqc_chem$pH [qaqc_chem$pH>14] = NA
 range(qaqc_chem$pH, na.rm = T)
 
 range(qaqc_chem$alk_mglCaCO3, na.rm = T)
-qaqc_chem$alk_mglCaCO3 [qaqc_chem$alk_mglCaCO3<=-99] = NA
 qaqc_chem$alk_mglCaCO3 [qaqc_chem$alk_mglCaCO3==99] = NA
 range(qaqc_chem$alk_mglCaCO3, na.rm = T)
 
 range(qaqc_chem$color_PCU, na.rm = T)
-qaqc_chem$color_PCU [qaqc_chem$color_PCU<=0] = NA
-range(qaqc_chem$color_PCU, na.rm = T)
 
 range(qaqc_chem$TP_mgl, na.rm = T)
-qaqc_chem$TP_mgl [qaqc_chem$TP_mgl<=-99] = NA
-range(qaqc_chem$TP_mgl, na.rm = T) #still some negative values, will recode to BDL
 
 #add flag for presumed BDL
 qaqc_chem <- qaqc_chem %>% 
@@ -190,9 +207,11 @@ range(qaqc_chem$cond_uScm, na.rm = T)
 #value for cond >9000 was in middle of lake - recoding, because that is obviously errant. The other values >1000 are in tributarys, which seems reasonable.
 qaqc_chem$cond_uScm [qaqc_chem$cond_uScm>9000] = NA
 range(qaqc_chem$cond_uScm, na.rm = T)
+# flag value above 3k as suspect
+qaqc_chem <- qaqc_chem %>% 
+  mutate(cond_flag = if_else(cond_uScm > 3000, 'suspect', ''))
+range(qaqc_chem$cond_uScm, na.rm = T)
 
-range(qaqc_chem$turb_NTU, na.rm = T)
-qaqc_chem$turb_NTU [qaqc_chem$turb_NTU==-99] = NA
 range(qaqc_chem$turb_NTU, na.rm = T)
 
 range(qaqc_chem$cl_mgl, na.rm = T)
@@ -254,6 +273,12 @@ ggplot(qaqc_chem, aes(x = date, y = TP_mgl, color = depth_m)) +
   facet_grid(site_type~. , scales = 'free_y') +
   geom_point(aes(shape = layer))
 
+ggplot(qaqc_chem, aes(x = as.numeric(format(date, '%j')), y = TP_mgl, color = depth_m)) +
+  facet_grid(site_type~. , scales = 'free_y') +
+  geom_point(aes(shape = layer))
+
+
+
 #### cond ####
 ggplot(qaqc_chem, aes(x = date, y = cond_uScm, color = depth_m)) +
   facet_grid(site_type~. , scales = 'free_y') +
@@ -263,10 +288,10 @@ ggplot(qaqc_chem, aes(x = date, y = cond_uScm, color = depth_m)) +
 #remove anomolous point above 2500
 qaqc_chem <- qaqc_chem %>% 
   mutate(cond_flag = case_when(cond_uScm>2500 ~ 'high cond suspect',
-                                site_type == 'lake' & cond_uScm < 47 ~ 'low cond suspect',
+                               site_type == 'lake' & cond_uScm < 47 ~ 'low cond suspect',
                                site_type == 'lake' & as.numeric(format(date, '%Y')) == 1997 &
                                  cond_uScm <65 ~ 'low cond suspect',
-                                TRUE ~ ''))
+                               TRUE ~ ''))
 
 ggplot(qaqc_chem, aes(x = date, y = cond_uScm, color = cond_flag)) +
   facet_grid(site_type~., scales = 'free_y') +
@@ -288,6 +313,10 @@ ggplot(qaqc_chem, aes(x = date, y = cond_uScm, color = cond_flag)) +
   facet_grid(site_type~. , scales = 'free_y') +
   geom_point(aes(shape = layer))+
   scale_x_date(minor_breaks = '1 year')
+
+ggplot(qaqc_chem, aes(x = as.numeric(format(date, "%j")), y = cond_uScm, color = cond_flag)) +
+  facet_grid(site_type~. , scales = 'free_y') +
+  geom_point(aes(shape = layer))
 
 
 #### turbidity ####
@@ -315,6 +344,9 @@ ggplot(qaqc_chem, aes(x = date, y = turb_NTU, color = turb_flag)) +
 ggplot(qaqc_chem, aes(x = date, y = cl_mgl, color = depth_m)) +
   facet_grid(site_type~. , scales = 'free_y') +
   geom_point(aes(shape = layer))
+ggplot(qaqc_chem, aes(x = as.numeric(format(date, "%j")), y = cl_mgl, color = depth_m)) +
+  facet_grid(site_type~. , scales = 'free_y') +
+  geom_point(aes(shape = layer))
 
 #### color ####
 ggplot(qaqc_chem, aes(x = date, y = color_PCU)) +
@@ -322,12 +354,12 @@ ggplot(qaqc_chem, aes(x = date, y = color_PCU)) +
   geom_point(aes(shape = layer))
 
 #need to recode values of 99 prior to 2021
-qaqc_chem$color_PCU = ifelse(qaqc_chem$color_PCU == 99 & 
+qaqc_chem$color_PCU = ifelse((qaqc_chem$color_PCU == 99 | qaqc_chem$color_PCU == 0) & 
                                qaqc_chem$date < as.Date('2021-01-01'), 
                              NA_real_, 
                              qaqc_chem$color_PCU)
 qaqc_chem <- qaqc_chem %>% 
-  mutate(color_flag = case_when(color_PCU> 50 & site_type == 'lake' ~ 'high color suspect',
+  mutate(color_flag = case_when(color_PCU>60 & site_type == 'lake' ~ 'high color suspect',
                                 TRUE ~ ''))
 
 ggplot(qaqc_chem, aes(x = date, y = color_PCU, color = color_flag)) +
@@ -339,9 +371,9 @@ ggplot(qaqc_chem, aes(x = date, y = color_PCU, color = color_flag)) +
 unique(qaqc_chem$Comments)
 # move the storm event into own column
 qaqc_chem <- qaqc_chem %>% 
-  mutate(gen_flag = case_when(Comments == 'STORM EVENT' ~ 'storm event sampling',
-                              TRUE ~ '')) %>% 
-  select(-Comments)
+  mutate(gen_flag = if_else(Comments == 'STORM EVENT',
+                            'storm event sampling',
+                            '')) 
 
 ### create vertical dataset, eliminate na rows and export master files ####
 #create vertical dataset
@@ -394,15 +426,17 @@ ggplot(qaqc_chem_vert, aes(x = date, y = value, color = flag)) +
 #apply ODM cv
 unique(qaqc_chem_vert$parameter)
 qaqc_chem_vert <- qaqc_chem_vert %>% 
-  mutate(parameter = case_when(parameter == 'alk_mglCaCO3' ~ 'alkalinity_mglCaCO3',
-                               parameter == 'TP_mgl' ~ 'phosphorusTotal_mgl',
-                               parameter == 'cond_uScm' ~ 'specificConductance_uScm',
-                               parameter == 'turb_NTU' ~ 'turbidity_NTU',
-                               parameter == 'cl_mgl' ~ 'chloride_mgl',
-                               parameter == 'conc_H_molpl' ~ 'hydrogenDissolved_moll',
+  mutate(parameter = case_when(parameter == 'alk_mglCaCO3' ~ 'alkalinity_milligramCaCO3PerLiter',
+                               parameter == 'TP_mgl' ~ 'phosphorusTotal_milligramPerLiter',
+                               parameter == 'cond_uScm' ~ 'specificConductance_microSiemenPerCentimeter',
+                               parameter == 'turb_NTU' ~ 'turbidity_nephelometricTurbidityUnit',
+                               parameter == 'cl_mgl' ~ 'chloride_milligramPerLiter',
+                               parameter == 'conc_H_molpl' ~ 'hydrogenDissolved_molePerLiter',
+                               parameter == 'color_PCU' ~ 'color_platinumCobaltUnit',
                                TRUE ~ parameter))
 
 summary(qaqc_chem_vert)
+unique(qaqc_chem_vert$parameter)
 
 # BIOLOGICAL DATA ####
 
@@ -411,12 +445,12 @@ summary(qaqc_chem_vert)
 
 # import data
 raw_bio_2017 <- read_xlsx(paste0(datadir, "1986-2017/BIOLOGY.xlsx"), 
-                           sheet="BIOLOGY",
-                           col_types = 'text') %>% 
+                          sheet="BIOLOGY",
+                          col_types = 'text') %>% 
   mutate(DATE = as.Date(as.numeric(DATE), origin = '1899-12-30'))
 
 raw_bio_2018 <- read_csv(paste0(datadir, "2018/Sunapee 2018 Bio.csv"),
-                          col_types = cols(.default = col_character()),
+                         col_types = cols(.default = col_character()),
                          na = '-99') %>% 
   mutate(DATE = as.Date(DATE, format = '%m/%d/%Y'))
 
@@ -433,7 +467,12 @@ raw_bio_2020 <- read_csv(paste0(datadir,'2020/Sunapee2020BIO.csv'),
 raw_bio_2021 <- read_xlsx(file.path(datadir, '2021-2022/LMPBIO_2021_2022.xlsx'),
                           col_types = 'text') %>% 
   mutate(DATE = as.Date(as.numeric(DATE), origin = '1899-12-30'))
+
 raw_bio_2023 <- raw_chem_2023 %>% 
+  select(LAKE:DATE, CHL, SD, SD_Scope, CompleteDate, SampleID, ID, 
+         Date_Sta = Date_Sta_Lr)
+
+raw_bio_2024 <- raw_chem_2024 %>% 
   select(LAKE:DATE, CHL, SD, SD_Scope, CompleteDate, SampleID, ID, 
          Date_Sta = Date_Sta_Lr)
 
@@ -444,21 +483,23 @@ str(raw_bio_2019)
 str(raw_bio_2020)
 str(raw_bio_2021)
 str(raw_bio_2023)
+str(raw_bio_2024)
 
 ### collate bio data ####
 comp_bio <- full_join(raw_bio_2017, raw_bio_2018) %>% 
   full_join(., raw_bio_2019) %>% 
   full_join(., raw_bio_2020) %>% 
   full_join(., raw_bio_2021) %>% 
-  full_join(., raw_bio_2023)
+  full_join(., raw_bio_2023) %>% 
+  full_join(., raw_bio_2024)
 head(comp_bio)
 colnames(comp_bio)
 
 
 # format bio columns to numeric
 comp_bio <- comp_bio %>% 
-  mutate_at(vars(STATION, CHL, SD, SD_Scope, PCTPHY1, PCTPHY2, PCTPHY3),
-            ~ as.numeric(.))
+  mutate(across(.cols = c(STATION, CHL, SD, SD_Scope, PCTPHY1, PCTPHY2, PCTPHY3),
+                .fns = as.numeric))
 
 #grab area lakes
 area_bio = comp_bio %>% 
@@ -483,7 +524,7 @@ raw_bio <- comp_bio %>%
          phyto_net_c = NETPHY3,
          phyto_pct_c = PCTPHY3) %>% 
   mutate(site_type = case_when(station <500 ~ 'lake',
-                              station >= 500 ~ 'tributary')) %>% 
+                               station >= 500 ~ 'tributary')) %>% 
   relocate(station, site_type, date)
 head(raw_bio)
 
@@ -522,9 +563,21 @@ ggplot(qaqc_bio, aes(x = date, y = chla_ugl, color = flag_chla)) +
 
 
 ##### secchi depth ####
+
+# started using scope ~2022, pull secchi w scope into SD column with flag.
+sdd_scope <- qaqc_bio %>% 
+  select(date, station, site_type, secchi_scope_m) %>% 
+  filter(!is.na(secchi_scope_m)) %>% 
+  rename(secchidepth_m = secchi_scope_m) %>% 
+  mutate(flag_secchi = 'with scope')
+qaqc_bio <- qaqc_bio %>% 
+  select(-secchi_scope_m) %>% 
+  mutate(flag_secchi = "") %>% 
+  full_join(sdd_scope)
 range(qaqc_bio$secchidepth_m, na.rm = T) 
 qaqc_bio$secchidepth_m [qaqc_bio$secchidepth_m==-99] = NA
 range(qaqc_bio$secchidepth_m, na.rm = T)
+
 #will need to flag secchi of 0
 
 # plot secchi
@@ -542,23 +595,24 @@ ggplot(qaqc_bio, aes(x = date, y = secchidepth_m)) +
 qaqc_bio$secchidepth_m [qaqc_bio$secchidepth_m==0] = NA
 
 #flag secchi of repeated values
-qaqc_bio$flag_secchi <- ''
-qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==2 & qaqc_bio$station == 80] = 'suspect - possible bottom hit'
-qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==4 & (qaqc_bio$station == 20 | qaqc_bio$station == 60) ] = 'suspect - possible bottom hit'
+qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==2 & qaqc_bio$station == 80] = 'likely bottom'
+qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==4 & (qaqc_bio$station == 20 | qaqc_bio$station == 60) ] = 'likely bottom '
 qaqc_bio$flag_secchi [qaqc_bio$secchidepth_m==4.3 & qaqc_bio$station == 20] = 'suspect - possible bottom hit'
 
 #and by station
 ggplot(qaqc_bio, aes(x=date, y=secchidepth_m, color = flag_secchi)) +
   geom_point() +
-  theme_bw()
+  theme_bw() + 
+  facet_grid(station ~ ., scales = "free_y")
 
 #recode value at site 20 > 10m - that is almost certainly a typo
 qaqc_bio$secchidepth_m [qaqc_bio$secchidepth_m>10 & qaqc_bio$station == 20] = NA
 
-
 #plot again with flags
 ggplot(qaqc_bio, aes(x = date, y = secchidepth_m, color = flag_secchi )) +
   geom_point() 
+
+
 
 ### phyto data into separate file (very few observations) ####
 phyto <- qaqc_bio %>% 
@@ -622,9 +676,8 @@ ggplot(qaqc_bio_deep, aes(x=date, y=value, color = flag)) +
 #rename with ODM2 CV
 unique(qaqc_bio_vert$parameter)
 qaqc_bio_vert <- qaqc_bio_vert %>% 
-  mutate(parameter = case_when(parameter == 'chla_ugl' ~ 'chlorophyll_a_ugl',
-                               parameter == 'secchidepth_m' ~ 'secchiDepth_m',
-                               parameter == 'secchi_scope_m' ~ 'secchiDepth_scope_m',
+  mutate(parameter = case_when(parameter == 'chla_ugl' ~ 'chlorophyll_a_microgramPerLiter',
+                               parameter == 'secchidepth_m' ~ 'secchiDepth_meter',
                                TRUE ~ parameter))
 
 # DO data ####
@@ -633,19 +686,19 @@ qaqc_bio_vert <- qaqc_bio_vert %>%
 
 # load files
 raw_do_2017 <- read_xlsx(paste0(datadir, "1986-2017/DO.xlsx"), 
-                          sheet="DO",
-                          col_types = 'text') %>% 
+                         sheet="DO",
+                         col_types = 'text') %>% 
   mutate(DATE = as.Date(as.numeric(DATE), origin = '1899-12-30'))
 head(raw_do_2017)
 
 raw_do_2018 <- read_csv(paste0(datadir, "2018/Sunapee 2018 DO.csv"),
-                         col_types = cols(.default = col_character())) %>% 
+                        col_types = cols(.default = col_character())) %>% 
   mutate(DATE = as.Date(DATE, format = '%d-%b-%y'))
 head(raw_do_2018)
 
 raw_do_2019 <- read_csv(paste0(datadir, '2019/Sunapee2019DO.csv'),
-                         col_types = cols(.default = col_character()),
-                         col_names = c('DATE', 'TIME', 'STATION', 'SENSOR', 'TEMP', 'PCNTSAT','DO',  'DEPTH'),
+                        col_types = cols(.default = col_character()),
+                        col_names = c('DATE', 'TIME', 'STATION', 'SENSOR', 'TEMP', 'PCNTSAT','DO',  'DEPTH'),
                         skip = 1)%>% 
   mutate(DATE = as.Date(DATE, format = '%m/%d/%Y'))
 head(raw_do_2019)
@@ -671,6 +724,15 @@ raw_do_2023 = read_xlsx(file.path(datadir, '2023/LMPDO_2023_LS.xlsx'),
          PH = pH,
          Date_Sta = Date_Sta_Dp)
 head(raw_do_2023)
+
+
+raw_do_2024 = read_xlsx(file.path(datadir, '2024/LMPDO_2024_LakeSunapee.xlsx'),
+                        col_types = 'text') %>% 
+  mutate(DATE = as.Date(as.numeric(DATE), origin = '1899-12-30')) %>%
+  rename(SPC_USCM = `SPC-uS/cm`,
+         PH = pH,
+         Date_Sta = Date_Sta_Dp)
+head(raw_do_2024)
 
 #### read in prodss files from 2021 ----
 dss_cols = c('DATE', 'TIME', 'STATION', 'unit_id',
@@ -723,11 +785,16 @@ comp_do <- full_join(raw_do_2017, raw_do_2018) %>%
   full_join(., raw_do_2021) %>% 
   full_join(., prodss_2021) %>% 
   full_join(., raw_do_2023) %>% 
+  full_join(., raw_do_2024) %>% 
   mutate_at(vars(STATION, TEMP, PCNTSAT, DO, 
                  SPC_USCM, PH, NTU, DEPTH,
                  `Chl ug/L`, `Chl RFU`,
                  'PC ug/L', 'PC RFU'),
             ~(as.numeric(.)))
+
+# for now drop the data at site 1700, these are mislabeled, but I don't know how.
+comp_do <- comp_do %>% 
+  filter(STATION != 1700)
 
 head(comp_do)
 unique(comp_do$Comments)
@@ -748,7 +815,7 @@ weather_obs <- unique(weather_obs) %>%
   mutate(source = 'DO/Temperature record')
 
 write_csv(weather_obs, paste0(dumpdir, 'weather_observations.csv'))
-  
+
 #### pull out bottom z ####
 bottom_depth <- comp_do %>% 
   select(DATE, STATION, BOTTOMZ) %>% 
@@ -772,15 +839,6 @@ qaqc_do <- comp_do %>%
          `Chl ug/L`, `Chl RFU`,
          'PC ug/L', 'PC RFU', ID)
 
-#format depth, temp, do columns to numeric
-qaqc_do <- qaqc_do %>% 
-  mutate_at(vars(DEPTH, TEMP, DO, 
-                 PCNTSAT, SPC_USCM, 
-                 PH, NTU, 
-                 `Chl ug/L`, `Chl RFU`,
-                 'PC ug/L', 'PC RFU'),
-            ~ as.numeric(.))
-
 #### look at ranges and recode na and obviously errant data ####
 range(qaqc_do$TEMP, na.rm = T)
 # negative values are likely incorrect, will come back to this.
@@ -803,20 +861,20 @@ qaqc_do$NTU [qaqc_do$NTU < 0] = NA_real_
 range(qaqc_do$NTU, na.rm = T)
 
 range(qaqc_do$PH, na.rm = T)
-#0 will have to be recoded, see in context.
+qaqc_do$PH [qaqc_do$PH == 0] = NA_real_
+range(qaqc_do$PH, na.rm = T)
 
 range(qaqc_do$SPC_USCM, na.rm = T)
-#again, zero
+qaqc_do$SPC_USCM [qaqc_do$SPC_USCM == 0] = NA_real_
+range(qaqc_do$SPC_USCM, na.rm = T)
 
 range(qaqc_do$`Chl RFU`, na.rm = T)
 qaqc_do$`Chl RFU` [qaqc_do$`Chl RFU` < 0] = NA_real_
 range(qaqc_do$`Chl RFU`, na.rm = T)
-#0s
 
 range(qaqc_do$`Chl ug/L`, na.rm = T)
 qaqc_do$`Chl ug/L` [qaqc_do$`Chl ug/L` < 0] = NA_real_
 range(qaqc_do$`Chl ug/L`, na.rm = T)
-#0s
 
 range(qaqc_do$`PC ug/L`, na.rm = T)
 qaqc_do$`PC ug/L` [qaqc_do$`PC ug/L` < 0] = NA_real_
@@ -839,7 +897,7 @@ ggplot(qaqc_do, aes(x = DATE, y = DO)) +
 #couple of oddballs, but look good other than that. 
 
 #plot by year, color by station
-years = seq(1986, 2023, by =1)
+years = seq(1986, 2024, by =1)
 
 #Set up pdf device
 pdf(file=paste0(figuredump, 'sunapee annual do.pdf'),width=11,height=8.5)
@@ -892,7 +950,7 @@ qaqc_do <- qaqc_do %>%
                                DATE < as.Date('2003-06-01') & 
                                DO >7.5 ~ 'suspect',
                              TRUE ~ ''))
-         
+
 #Set up pdf device and overwrite previous file
 pdf(file=paste0(figuredump, 'sunapee annual do.pdf'),width=11,height=8.5)
 par()
@@ -1003,12 +1061,17 @@ qaqc_do$TEMP [qaqc_do$TEMP < 4 &
 ggplot(qaqc_do, aes(x = DATE, y = TEMP)) +
   geom_point()
 
+# look closer at 2020 forward
+qaqc_do %>% 
+  filter(year(DATE) >= 2020) %>% 
+  ggplot(., aes(x = DATE, y = TEMP)) +
+  geom_point()
+
+# all the low values are over winter, so good to go
+
 ##### pH ####
 ggplot(qaqc_do, aes(x = DATE, y = PH)) +
   geom_point()
-
-#recode 0 to na
-qaqc_do$PH = ifelse(qaqc_do$PH == 0, NA_real_, qaqc_do$PH)
 
 ggplot(qaqc_do, aes(x = DATE, y = PH)) +
   geom_point()
@@ -1028,8 +1091,6 @@ ggplot(qaqc_do, aes(x = DATE, y = NTU)) +
 ggplot(qaqc_do, aes(x = DATE, y = SPC_USCM)) +
   geom_point()
 
-#recode 0 to na 
-qaqc_do$SPC_USCM = ifelse(qaqc_do$SPC_USCM == 0, NA_real_, qaqc_do$SPC_USCM)
 
 #AGAIN, PROBABLY SOME PROMLEMATIC DATA HERE
 
@@ -1041,11 +1102,10 @@ ggplot(qaqc_do, aes(x = DATE, y = `Chl ug/L`)) +
 qaqc_do$`Chl ug/L` = ifelse(qaqc_do$`Chl ug/L` == 0, NA_real_, qaqc_do$`Chl ug/L`)
 qaqc_do$`Chl RFU` = ifelse(qaqc_do$`Chl RFU` == 0, NA_real_, qaqc_do$`Chl RFU`)
 
-ggplot(qaqc_do, aes(x = DATE, y = `Chl RFU`)) +
+qaqc_do %>% 
+  filter(year(DATE) > 2020) %>% 
+ggplot(., aes(x = DATE, y = `Chl RFU`)) +
   geom_point()
-
-# and flag rfu > 6 as suspect
-qaqc_do$chl_flag = ifelse(qaqc_do$`Chl RFU`>6|is.na(qaqc_do$`Chl RFU`), 'suspect', '')
 
 
 #### pc ugl and rfu ----
@@ -1104,15 +1164,16 @@ ggplot(do20, aes(x = DATE, y = value, color = DEPTH, shape = gen_flag))+
 qaqc_do <- qaqc_do %>% 
   rename(station = STATION,
          depth_m = DEPTH,
-         waterTemperature_degC = TEMP,
-         oxygenDissolved_mgl = DO,
-         oxygenDissolvedPercentOfSaturation_pct = PCNTSAT,
-         turbidity_NTU = NTU,
-         specificConductance_uScm = SPC_USCM,
-         chlorophyllFluorescence_ugl = `Chl ug/L`,
-         chlorophyllFluorescence_RFU = `Chl RFU`,
-         blue_GreenAlgae_Cyanobacteria_Phycocyanin_ugl = `PC ug/L`,
-         blue_GreenAlgae_Cyanobacteria_Phycocyanin_RFU = `PC RFU`,
+         waterTemperature_degreeCelsius = TEMP,
+         oxygenDissolved_milligramPerLiter = DO,
+         oxygenDissolvedPercentOfSaturation_percent = PCNTSAT,
+         turbidity_nephelometricTurbidityUnit = NTU,
+         specificConductance_microSiemenPerCentimeter = SPC_USCM,
+         chlorophyllFluorescence_microgramPerLiter = `Chl ug/L`,
+         chlorophyllFluorescence_relativeFluorescenceUnit = `Chl RFU`,
+         blue_GreenAlgae_Cyanobacteria_Phycocyanin_microgramPerLiter = `PC ug/L`,
+         blue_GreenAlgae_Cyanobacteria_Phycocyanin_relativeFluorescenceUnit = `PC RFU`,
+         hydrogenDissolved_molePerLiter = conc_H_molpl,
          date = DATE,
          org_id = ID) %>% 
   mutate(station = as.numeric(station))
@@ -1121,16 +1182,14 @@ str(qaqc_do)
 #### create vertical dataset ####
 qaqc_do_vert <- qaqc_do %>% 
   select(-year) %>% 
-  gather(parameter, value, -station, -depth_m, -date, -do_flag, -chl_flag, -gen_flag, -org_id) %>% 
+  gather(parameter, value, -station, -depth_m, -date, -do_flag, -gen_flag, -org_id) %>% 
   filter(!is.na(value)) %>% 
   mutate(site_type = 'lake',
          depth_m = round(depth_m, digits = 1)) %>% 
   mutate(flag = '') %>% 
-  mutate(flag = case_when(parameter == 'oxygenDissolved_mgl' ~ do_flag,
-                          parameter == 'oxygenDissolvedPercentOfSaturation_pct' ~ do_flag,
-                          parameter == 'chlorophyllFluorescence_ugl' | parameter == 'chlorophyllFluorescence_RFU' ~ chl_flag,
+  mutate(flag = case_when(parameter == 'oxygenDissolved_milligramPerLiter'| parameter == 'oxygenDissolvedPercentOfSaturation_percent' ~ do_flag,
                           TRUE ~ '')) %>% 
-  select(-do_flag, -chl_flag) 
+  select(-do_flag) 
 
 ggplot(qaqc_do_vert, aes(x = date, y = value, color = flag)) +
   geom_point() +
@@ -1172,19 +1231,19 @@ lake_do <- primary_file_lake %>%
          do_flag = flag) %>% 
   select(-parameter, -layer, - org_id, -org_sampid)
 lake_dosat<- primary_file_lake %>% 
-  filter(parameter == 'oxygenDissolvedPercentOfSaturation_pct') %>% 
+  filter(parameter == 'oxygenDissolvedPercentOfSaturation_percent') %>% 
   rename(DO_pctsat = value,
          dosat_flag = flag) %>% 
   select(-parameter, -layer, - org_id, -org_sampid)
 lake_turb<- primary_file_lake %>% 
-  filter(parameter == 'turbidity_NTU') %>% 
+  filter(parameter == 'turbidity_nephelometricTurbidityUnit') %>% 
   rename(turb_NTU = value,
          turb_flag = flag) %>% 
   select(-parameter, -layer, - org_id, -org_sampid)
 do_turb <- full_join(lake_do, lake_dosat) %>% 
   full_join(., lake_turb)
 
-years_doturb = seq(2001, 2023, by = 1)
+years_doturb = seq(2001, 2024, by = 1)
 
 pdf(file=paste0(figuredump, 'annual do and turbidity by year.pdf'),width=11,height=8.5)
 par()
@@ -1228,7 +1287,7 @@ primary_file_vert <- primary_file_vert %>%
   select(station, date, depth_m, layer, site_type, 
          parameter, value, flag, gen_flag, org_sampid, org_id)
 
-write_csv(primary_file_vert, paste0(dumpdir, 'LSPALMP_1986-2023_v', Sys.Date(), '.csv'))
+write_csv(primary_file_vert, paste0(dumpdir, 'LSPALMP_1986-2024_v', Sys.Date(), '.csv'))
 
 # COLLATE STATION LOCATIONS AND CREATE PARAMETER SUMMARIES ####
 
@@ -1240,7 +1299,7 @@ station <- tibble(station)
 station_details <- station %>% 
   mutate(station = as.numeric(station)) %>% 
   mutate(site_type = case_when((station) <= 500 ~ 'lake',
-                              TRUE ~ 'tributary')) %>% 
+                               TRUE ~ 'tributary')) %>% 
   mutate(sub_site_type = case_when(site_type == 'lake' & (station) >=200 ~ 'deep',
                                    site_type == 'lake' & station <200 ~ 'cove',
                                    TRUE ~ '')) 
@@ -1285,7 +1344,7 @@ lake <- read_xls(paste0(datadir, 'station locations/Cove  Deep + Buoy WQ Sample 
   mutate(lat_dd = round(Y, digits = 4),
          lon_dd = round(X, digits = 4)) %>% 
   select(station, lat_dd, lon_dd)
-  
+
 temp <- full_join(templake, temptributary) %>% 
   select(AliasID, LATDECDEG, LONGDECDEG) %>% 
   rename(station = AliasID, 
@@ -1322,3 +1381,4 @@ station_details <- full_join(station_details, onestop) %>%
   filter(!is.na(site_type))
 
 write_csv(station_details, paste0(dumpdir, 'station_location_details.csv'))
+
